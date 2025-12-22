@@ -9,20 +9,26 @@ export const groqConfig = {
     // Model settings
     settings: {
         temperature: 0.7,
-        maxTokens: 4096,
+        maxTokens: 3000, // Reduced from 4096 to handle more requests
         responseFormat: { type: 'json_object' }
     },
 
-    // Rate limit settings
+    // Rate limit settings (conservative to avoid hitting API limits)
     rateLimit: {
-        requestsPerMinute: 30,
-        tokensPerMinute: 6000
+        requestsPerMinute: 25, // Reduced from 30 to leave buffer
+        tokensPerMinute: 15000 // Increased buffer
     },
 
     // Retry configuration
     retry: {
-        maxAttempts: 2,
-        delayMs: 1000
+        maxAttempts: 3, // Increased from 2
+        delayMs: 1500 // Increased delay between retries
+    },
+
+    // Concurrency settings
+    concurrency: {
+        maxConcurrent: 5, // Max 5 users can chat simultaneously
+        queueTimeout: 30000 // 30 seconds timeout for queued requests
     }
 };
 

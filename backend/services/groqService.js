@@ -8,6 +8,17 @@ class GroqService {
         this.settings = groqConfig.settings;
         this.retryConfig = groqConfig.retry;
         this._groq = null; // Lazy initialization
+
+        // Request queue for handling concurrent users
+        this.requestQueue = [];
+        this.isProcessing = false;
+        this.maxConcurrent = 5; // Max concurrent requests
+        this.activeRequests = 0;
+
+        // Rate limiting tracking
+        this.requestCount = 0;
+        this.tokenCount = 0;
+        this.resetTime = Date.now() + 60000; // Reset every minute
     }
 
     // Lazy initialize Groq client
@@ -22,71 +33,149 @@ class GroqService {
     }
 
     /**
+     * Reset rate limit counters
+     */
+    resetRateLimits() {
+        const now = Date.now();
+        if (now >= this.resetTime) {
+            this.requestCount = 0;
+            this.tokenCount = 0;
+            this.resetTime = now + 60000;
+            console.log('🔄 Rate limit counters reset');
+        }
+    }
+
+    /**
+     * Check if we're within rate limits
+     */
+    checkRateLimits() {
+        this.resetRateLimits();
+        return this.requestCount < groqConfig.rateLimit.requestsPerMinute;
+    }
+
+    /**
+     * Add request to queue and process
+     */
+    async queueRequest(fn) {
+        return new Promise((resolve, reject) => {
+            this.requestQueue.push({ fn, resolve, reject });
+            this.processQueue();
+        });
+    }
+
+    /**
+     * Process queued requests with concurrency control
+     */
+    async processQueue() {
+        if (this.isProcessing || this.activeRequests >= this.maxConcurrent) {
+            return;
+        }
+
+        if (this.requestQueue.length === 0) {
+            return;
+        }
+
+        this.isProcessing = true;
+        const { fn, resolve, reject } = this.requestQueue.shift();
+        this.activeRequests++;
+
+        try {
+            const result = await fn();
+            resolve(result);
+        } catch (error) {
+            reject(error);
+        } finally {
+            this.activeRequests--;
+            this.isProcessing = false;
+            // Process next request
+            if (this.requestQueue.length > 0) {
+                setImmediate(() => this.processQueue());
+            }
+        }
+    }
+
+    /**
      * Call Groq API with automatic fallback to faster model
      * @param {Array} messages - Chat messages array
      * @param {Object} options - Additional options
      * @returns {Promise} API response
      */
     async chat(messages, options = {}) {
-        const model = options.model || this.primaryModel;
-        const temperature = options.temperature || this.settings.temperature;
-        const maxTokens = options.maxTokens || this.settings.maxTokens;
-        const useJsonFormat = options.useJsonFormat !== false; // Default to true, but allow disabling
-
-        try {
-            console.log(`🤖 Groq AI: Using model ${model}...`);
-            const startTime = Date.now();
-
-            const completionParams = {
-                messages,
-                model,
-                temperature,
-                max_tokens: maxTokens
-            };
-
-            // Only add response_format if useJsonFormat is true
-            if (useJsonFormat) {
-                completionParams.response_format = this.settings.responseFormat;
+        // Use queue for all requests to manage concurrency
+        return this.queueRequest(async () => {
+            // Check rate limits before making request
+            if (!this.checkRateLimits()) {
+                console.log('⚠️ Rate limit reached, using fallback model immediately');
+                return await this.fallbackToFasterModel(messages, { ...options, skipQueue: true });
             }
 
-            const completion = await this.getGroqClient().chat.completions.create(completionParams);
+            const model = options.model || this.primaryModel;
+            const temperature = options.temperature || this.settings.temperature;
+            const maxTokens = options.maxTokens || this.settings.maxTokens;
+            const useJsonFormat = options.useJsonFormat !== false;
 
-            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-            const tokensUsed = completion.usage?.total_tokens || 0;
+            try {
+                console.log(`🤖 Groq AI: Using model ${model}... (Queue: ${this.requestQueue.length}, Active: ${this.activeRequests})`);
+                const startTime = Date.now();
 
-            console.log(`✅ Groq AI: Success in ${duration}s (${tokensUsed} tokens)`);
+                const completionParams = {
+                    messages,
+                    model,
+                    temperature,
+                    max_tokens: maxTokens
+                };
 
-            return {
-                success: true,
-                content: completion.choices[0].message.content,
-                model: model,
-                tokensUsed,
-                duration
-            };
+                if (useJsonFormat) {
+                    completionParams.response_format = this.settings.responseFormat;
+                }
 
-        } catch (error) {
-            console.error(`❌ Groq AI Error (${model}):`, error.message);
+                const completion = await this.getGroqClient().chat.completions.create(completionParams);
 
-            // Check if rate limit error
-            if (this.isRateLimitError(error)) {
-                console.log(`⚠️ Rate limit hit, trying fallback model: ${this.fallbackModel}`);
-                return await this.fallbackToFasterModel(messages, options);
+                const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                const tokensUsed = completion.usage?.total_tokens || 0;
+
+                // Update rate limit tracking
+                this.requestCount++;
+                this.tokenCount += tokensUsed;
+
+                console.log(`✅ Groq AI: Success in ${duration}s (${tokensUsed} tokens) [Requests: ${this.requestCount}/${groqConfig.rateLimit.requestsPerMinute}]`);
+
+                return {
+                    success: true,
+                    content: completion.choices[0].message.content,
+                    model: model,
+                    tokensUsed,
+                    duration
+                };
+
+            } catch (error) {
+                console.error(`❌ Groq AI Error (${model}):`, error.message);
+
+                // Check if rate limit error
+                if (this.isRateLimitError(error)) {
+                    console.log(`⚠️ Rate limit hit, switching to fallback model: ${this.fallbackModel}`);
+                    // Wait longer before fallback
+                    await this.delay(2000);
+                    return await this.fallbackToFasterModel(messages, { ...options, skipQueue: true });
+                }
+
+                // Check if quota/credit error
+                if (this.isQuotaError(error)) {
+                    console.log(`⚠️ Quota exhausted, using fallback model: ${this.fallbackModel}`);
+                    await this.delay(1000);
+                    return await this.fallbackToFasterModel(messages, { ...options, skipQueue: true });
+                }
+
+                // Other errors - try fallback once
+                if (model === this.primaryModel && !options.isRetry) {
+                    console.log(`⚠️ Primary model failed, trying fallback: ${this.fallbackModel}`);
+                    await this.delay(1000);
+                    return await this.fallbackToFasterModel(messages, { ...options, skipQueue: true });
+                }
+
+                throw error;
             }
-
-            // Check if quota/credit error
-            if (this.isQuotaError(error)) {
-                console.log(`⚠️ Quota/credits exhausted, trying fallback model: ${this.fallbackModel}`);
-                return await this.fallbackToFasterModel(messages, options);
-            }
-
-            // Other errors - try fallback once
-            if (model === this.primaryModel && !options.isRetry) {
-                console.log(`⚠️ Primary model failed, trying fallback: ${this.fallbackModel}`);
-                return await this.fallbackToFasterModel(messages, options);
-            }
-
-            throw error;
-        }
+        });
     }
 
     /**
@@ -94,20 +183,65 @@ class GroqService {
      */
     async fallbackToFasterModel(messages, options) {
         try {
-            // Wait briefly before retry
+            // If skipQueue is set, execute directly (already in queue)
+            if (options.skipQueue) {
+                // Wait briefly before retry
+                await this.delay(this.retryConfig.delayMs);
+
+                const model = this.fallbackModel;
+                const temperature = options.temperature || this.settings.temperature;
+                const maxTokens = 2000; // Reduced for fallback
+                const useJsonFormat = options.useJsonFormat !== false;
+
+                console.log(`🔄 Using fallback model: ${model}`);
+                const startTime = Date.now();
+
+                const completionParams = {
+                    messages,
+                    model,
+                    temperature,
+                    max_tokens: maxTokens
+                };
+
+                if (useJsonFormat) {
+                    completionParams.response_format = this.settings.responseFormat;
+                }
+
+                const completion = await this.getGroqClient().chat.completions.create(completionParams);
+
+                const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                const tokensUsed = completion.usage?.total_tokens || 0;
+
+                this.requestCount++;
+                this.tokenCount += tokensUsed;
+
+                console.log(`✅ Fallback model success in ${duration}s (${tokensUsed} tokens)`);
+
+                return {
+                    success: true,
+                    content: completion.choices[0].message.content,
+                    model: model,
+                    tokensUsed,
+                    duration,
+                    isFallback: true
+                };
+            }
+
+            // Normal queue flow
             await this.delay(this.retryConfig.delayMs);
 
-            // Use fallback model with reduced tokens
             return await this.chat(messages, {
                 ...options,
                 model: this.fallbackModel,
-                maxTokens: 3000, // Reduce token limit for fallback
+                maxTokens: 2000,
                 isRetry: true
             });
 
         } catch (error) {
             console.error(`❌ Fallback model also failed:`, error.message);
-            throw new Error('Both primary and fallback AI models failed. Please try again later.');
+
+            // If both models fail, return a helpful error message
+            throw new Error('AI service is temporarily busy. Please wait a moment and try again. Our system is handling multiple requests.');
         }
     }
 

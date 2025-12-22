@@ -122,7 +122,58 @@ const DiksuchAI = ({ projectContext = null }) => {
         } catch (error) {
             console.error('Chat error:', error);
 
-            if (error.response?.status === 403) {
+            // Check if content was blocked
+            if (error.response?.data?.blocked) {
+                toast.error(error.response.data.message, {
+                    duration: 6000,
+                    icon: '🚫',
+                    style: {
+                        background: '#fee',
+                        color: '#c33',
+                        fontWeight: 'bold'
+                    }
+                });
+
+                // Add blocked message to conversation
+                setConversation(prev => [
+                    ...prev,
+                    {
+                        role: 'assistant',
+                        content: error.response.data.message,
+                        isBlocked: true
+                    }
+                ]);
+            } else if (error.response?.status === 429) {
+                // Rate limit error
+                const retryAfter = error.response.data?.retryAfter || 5;
+                toast.error(`🤖 AI is busy. Please wait ${retryAfter} seconds!`, {
+                    duration: 5000,
+                    icon: '⏳'
+                });
+
+                setConversation(prev => [
+                    ...prev,
+                    {
+                        role: 'assistant',
+                        content: `⏳ AI is handling other requests. Please wait ${retryAfter} seconds and try again!`,
+                        isError: true
+                    }
+                ]);
+            } else if (error.response?.status === 503) {
+                toast.error('🤖 AI temporarily busy. Please retry!', {
+                    duration: 4000,
+                    icon: '🔄'
+                });
+
+                setConversation(prev => [
+                    ...prev,
+                    {
+                        role: 'assistant',
+                        content: '🔄 AI service is temporarily busy. Please try again.',
+                        isError: true
+                    }
+                ]);
+            } else if (error.response?.status === 403) {
                 toast.error('Daily credit limit reached! Upgrade to premium for unlimited access.', {
                     duration: 5000,
                     icon: '⚡'
