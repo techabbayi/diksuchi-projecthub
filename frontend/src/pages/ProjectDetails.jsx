@@ -250,23 +250,23 @@ const ProjectDetails = () => {
                     {/* Back Button */}
                     <Button
                         onClick={() => navigate(-1)}
-                        className="mb-6 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20 font-semibold px-4 py-2 rounded-xl transition-all"
+                        className="mb-6 bg-gray-900/10 dark:bg-white/10 backdrop-blur-sm border-2 border-gray-900/30 dark:border-white/30 text-gray-900 dark:text-white hover:bg-gray-900/20 dark:hover:bg-white/20 font-semibold px-4 py-2 rounded-xl transition-all"
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back
                     </Button>
                     <div className="grid grid-cols-1 lg:grid-cols-6 gap-12 items-center">
                         {/* Left: Project Info */}
-                        <div className="lg:col-span-3 space-y-6 text-white">
+                        <div className="lg:col-span-3 space-y-6 text-gray-900 dark:text-white">
                             <div className="flex flex-wrap gap-3">
-                                <Badge className="bg-white/20 backdrop-blur-sm border-2 border-white/30 text-white font-bold text-sm px-4 py-1.5">
+                                <Badge className="bg-gray-900/20 dark:bg-white/20 backdrop-blur-sm border-2 border-gray-900/30 dark:border-white/30 text-gray-900 dark:text-white font-bold text-sm px-4 py-1.5">
                                     {project.tier}
                                 </Badge>
-                                <Badge className="bg-white/20 backdrop-blur-sm border-2 border-white/30 text-white font-bold text-sm px-4 py-1.5">
+                                <Badge className="bg-gray-900/20 dark:bg-white/20 backdrop-blur-sm border-2 border-gray-900/30 dark:border-white/30 text-gray-900 dark:text-white font-bold text-sm px-4 py-1.5">
                                     {project.difficulty}
                                 </Badge>
                                 {project.verifiedByAdmin && (
-                                    <Badge className="bg-[#ffb703] border-2 border-white/30 text-white font-bold text-sm px-4 py-1.5 flex items-center gap-1.5">
+                                    <Badge className="bg-[#ffb703] border-2 border-gray-900/30 dark:border-white/30 text-white font-bold text-sm px-4 py-1.5 flex items-center gap-1.5">
                                         <Star className="h-3.5 w-3.5" />
                                         Verified
                                     </Badge>
@@ -275,26 +275,26 @@ const ProjectDetails = () => {
 
                             <h1 className="text-5xl lg:text-6xl font-black leading-tight">{project.title}</h1>
 
-                            <p className="text-xl text-white/90 leading-relaxed">{project.description}</p>
+                            <p className="text-xl text-gray-800 dark:text-white/90 leading-relaxed">{project.description}</p>
 
                             {/* Stats Bar */}
                             <div className="flex flex-wrap items-center gap-6 pt-4">
                                 <div className="flex items-center gap-2">
                                     <Star className="h-6 w-6 fill-[#ffb703] text-[#ffb703]" />
                                     <span className="text-2xl font-black">{project.rating?.toFixed(1) || '0.0'}</span>
-                                    <span className="text-white/80 text-sm">({project.reviewCount || 0})</span>
+                                    <span className="text-gray-700 dark:text-white/80 text-sm">({project.reviewCount || 0})</span>
                                 </div>
-                                <div className="h-8 w-px bg-white/30"></div>
+                                <div className="h-8 w-px bg-gray-900/30 dark:bg-white/30"></div>
                                 <div className="flex items-center gap-2">
                                     <Download className="h-6 w-6" />
                                     <span className="text-xl font-bold">{project.downloads || 0}</span>
-                                    <span className="text-white/80 text-sm">downloads</span>
+                                    <span className="text-gray-700 dark:text-white/80 text-sm">downloads</span>
                                 </div>
-                                <div className="h-8 w-px bg-white/30"></div>
+                                <div className="h-8 w-px bg-gray-900/30 dark:bg-white/30"></div>
                                 <div className="flex items-center gap-2">
                                     <Eye className="h-6 w-6" />
                                     <span className="text-xl font-bold">{project.views || 0}</span>
-                                    <span className="text-white/80 text-sm">views</span>
+                                    <span className="text-gray-700 dark:text-white/80 text-sm">views</span>
                                 </div>
                             </div>
 
@@ -322,7 +322,7 @@ const ProjectDetails = () => {
                                         variant="outline"
                                         className={`border-2 font-bold px-8 py-6 text-lg rounded-2xl transition-all hover:scale-105 ${isFavorite
                                             ? 'bg-rose-500 border-rose-500 text-white hover:bg-rose-600'
-                                            : 'bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20'
+                                            : 'bg-gray-900/10 dark:bg-white/10 backdrop-blur-sm border-gray-900/30 dark:border-white/30 text-gray-900 dark:text-white hover:bg-gray-900/20 dark:hover:bg-white/20'
                                             }`}
                                         onClick={handleToggleFavorite}
                                         disabled={checkingFavorite}
@@ -336,7 +336,7 @@ const ProjectDetails = () => {
 
                         {/* Right: Screenshot */}
                         <div className="lg:col-span-3 relative">
-                            <div className="rounded-3xl overflow-hidden border-4 border-white/20 shadow-2xl backdrop-blur-sm">
+                            <div className="rounded-3xl overflow-hidden border-4 border-gray-900/20 dark:border-white/20 shadow-2xl backdrop-blur-sm">
                                 <img
                                     src={project.screenshots?.[0] || 'https://via.placeholder.com/800x600'}
                                     alt={project.title}
@@ -348,16 +348,16 @@ const ProjectDetails = () => {
 
                     {/* Tech Stack - Below Screenshot */}
                     <div className="pt-8">
-                        <div className="bg-white/10 backdrop-blur-sm border-2 border-white/20 rounded-2xl p-6">
-                            <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
-                                <div className="w-1.5 h-6 bg-white rounded-full"></div>
+                        <div className="bg-gray-900/10 dark:bg-white/10 backdrop-blur-sm border-2 border-gray-900/20 dark:border-white/20 rounded-2xl p-6">
+                            <h3 className="text-gray-900 dark:text-white font-bold text-lg mb-4 flex items-center gap-2">
+                                <div className="w-1.5 h-6 bg-gray-900 dark:bg-white rounded-full"></div>
                                 Technologies Used
                             </h3>
                             <div className="flex flex-wrap gap-3">
                                 {project.techStack?.map((tech, index) => (
                                     <Badge
                                         key={index}
-                                        className="bg-white text-[#2d6a4f] font-bold text-sm px-4 py-2 rounded-xl hover:scale-105 transition-transform cursor-default"
+                                        className="bg-white dark:bg-slate-800 text-[#2d6a4f] dark:text-[#74c69d] border border-gray-200 dark:border-slate-700 font-bold text-sm px-4 py-2 rounded-xl hover:scale-105 transition-transform cursor-default"
                                     >
                                         {tech}
                                     </Badge>
