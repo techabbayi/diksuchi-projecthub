@@ -79,9 +79,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(compression());
 
 // CORS - More permissive configuration
+const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    : ['http://localhost:5173'];
+
 app.use(
     cors({
-        origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
+        origin: allowedOrigins,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
