@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Green Theme - Light Mode */
+    --background: 156 14% 94%;
+    /* #f8faf9 - off-white background */
+    --foreground: 160 39% 29%;
+    /* #2d6a4f - dark green text */
+    --card: 156 14% 94%;
+    /* #f8faf9 - off-white cards */
+    --card-foreground: 160 39% 29%;
+    /* #2d6a4f - dark green text */
+    --popover: 156 14% 94%;
+    /* #f8faf9 - off-white popover */
+    --popover-foreground: 160 39% 29%;
+    /* #2d6a4f - dark green text */
+    --primary: 160 39% 29%;
+    /* #2d6a4f - dark green primary */
+    --primary-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text on primary */
+    --secondary: 152 22% 63%;
+    /* #74c69d - medium green secondary */
+    --secondary-foreground: 160 39% 29%;
+    /* #2d6a f - dark green text */
+    --muted: 150 18% 86%;
+    /* #d8e2dc - light gray/green muted */
+    --muted-foreground: 160 39% 29%;
+    /* #2d6a4f - dark green text */
+    --accent: 175 76% 48%;
+    /* #2ec4b6 - teal accent */
+    --accent-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --destructive: 0 84% 60%;
+    /* Red for destructive actions */
+    --destructive-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --border: 150 18% 86%;
+    /* #d8e2dc - light gray/green border */
+    --input: 150 18% 86%;
+    /* #d8e2dc - light gray/green input border */
+    --ring: 160 39% 29%;
+    /* #2d6a4f - dark green ring */
+    --warning: 45 100% 51%;
+    /* #ffb703 - yellow/gold warning */
+    --warning-foreground: 160 39% 29%;
+    /* #2d6a4f - dark green text */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* Green Theme - Dark Mode */
+    --background: 160 39% 15%;
+    /* Darker green background */
+    --foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --card: 160 39% 20%;
+    /* Dark green cards */
+    --card-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --popover: 160 39% 20%;
+    /* Dark green popover */
+    --popover-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --primary: 152 22% 63%;
+    /* #74c69d - medium green primary */
+    --primary-foreground: 160 39% 15%;
+    /* Dark background text */
+    --secondary: 160 39% 29%;
+    /* #2d6a4f - dark green secondary */
+    --secondary-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --muted: 160 39% 25%;
+    /* Muted dark green */
+    --muted-foreground: 150 18% 86%;
+    /* #d8e2dc - light gray/green text */
+    --accent: 175 76% 48%;
+    /* #2ec4b6 - teal accent */
+    --accent-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --destructive: 0 63% 31%;
+    /* Dark red for destructive actions */
+    --destructive-foreground: 156 14% 94%;
+    /* #f8faf9 - off-white text */
+    --border: 160 39% 25%;
+    /* Dark green border */
+    --input: 160 39% 25%;
+    /* Dark green input border */
+    --ring: 152 22% 63%;
+    /* #74c69d - medium green ring */
+    --warning: 45 100% 51%;
+    /* #ffb703 - yellow/gold warning */
+    --warning-foreground: 160 39% 15%;
+    /* Dark background text */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+    /* Hide scrollbar for all browsers */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    transition: background-color 200ms ease-out,
+      color 200ms ease-out;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+    position: relative;
+    /* Hide scrollbar for all browsers */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+  }
+
+  body::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
+  }
+
+  #root {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+    position: relative;
+    /* Hide scrollbar for all browsers */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+  }
+
+  #root::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Poppins', 'Inter', sans-serif;
+  }
+
+  /* Ensure minimum touch target size for mobile */
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent horizontal scroll on all containers */
+  .container,
+  main,
+  section,
+  div {
+    max-width: 100%;
+  }
+
+  .container,
+  main,
+  section {
+    overflow-x: hidden;
+  }
+
+  /* Truncate long text to prevent overflow */
+  .truncate-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Performance optimizations for animations */
+  [class*="bg-gradient"],
+  [class*="backdrop-blur"] {
+    will-change: transform, opacity;
+  }
+
+  .animate-pulse,
+  .animate-bounce,
+  [class*="transition"] {
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Hide scrollbars globally for all elements */
+  * {
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
+  }
+}
+
+/* Remove custom scrollbar styles since we're hiding them */
