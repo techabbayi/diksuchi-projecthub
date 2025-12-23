@@ -33,7 +33,7 @@ const Projects = () => {
         setLoading(true);
         try {
             const [projectsRes, favoritesRes] = await Promise.all([
-                api.get('/projects'),
+                api.get('/projects?limit=1000'),
                 user ? api.get('/reviews/favorites/my').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } })
             ]);
 
@@ -357,8 +357,8 @@ const Projects = () => {
                                                     key={page}
                                                     onClick={() => goToPage(page)}
                                                     className={`h-10 w-10 font-bold ${currentPage === page
-                                                            ? 'bg-[#2d6a4f] text-white border-2 border-[#2d6a4f]'
-                                                            : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-2 border-[#d8e2dc] dark:border-slate-600 hover:bg-[#2d6a4f] hover:text-white dark:hover:bg-[#2d6a4f]'
+                                                        ? 'bg-[#2d6a4f] text-white border-2 border-[#2d6a4f]'
+                                                        : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-2 border-[#d8e2dc] dark:border-slate-600 hover:bg-[#2d6a4f] hover:text-white dark:hover:bg-[#2d6a4f]'
                                                         }`}
                                                 >
                                                     {page}

@@ -16,7 +16,6 @@ const projectSchema = new mongoose.Schema(
         techStack: [
             {
                 type: String,
-                required: true,
             },
         ],
         difficulty: {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Download, FileJson, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Plus, Trash2, Edit } from 'lucide-react';
+import { Upload, Download, FileJson, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Plus, Trash2, Edit, Settings, Save, Image, X } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
 import api from '../lib/api';
@@ -15,21 +15,133 @@ const BulkUpload = () => {
     const [formProjects, setFormProjects] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [editingIndex, setEditingIndex] = useState(-1);
-    const [currentProject, setCurrentProject] = useState({
-        title: '',
-        description: '',
-        techStack: '',
+    const [uploadingFiles, setUploadingFiles] = useState(false);
+    const [uploadedScreenshots, setUploadedScreenshots] = useState([]);
+
+    // Session Defaults
+    const [showDefaultsSetup, setShowDefaultsSetup] = useState(true);
+    const [sessionDefaults, setSessionDefaults] = useState({
         difficulty: 'Beginner',
         type: 'free',
         price: 0,
         mode: 'github',
+        techStack: '',
+        category: 'Web Development'
+    });
+    const [defaultsSet, setDefaultsSet] = useState(false);
+    const [customCategory, setCustomCategory] = useState('');
+    const [selectedTags, setSelectedTags] = useState([]);
+    const [selectedTechStack, setSelectedTechStack] = useState([]);
+
+    // Pre-built tech stack for quick selection
+    const predefinedTechStack = [
+        'MERN', 'MEAN', 'Python', 'Java', 'C++', 'JavaScript', 'TypeScript',
+        'React', 'Node.js', 'Express.js', 'Angular', 'Vue.js', 'Next.js',
+        'Django', 'Flask', 'FastAPI', 'Spring Boot', 'Hibernate',
+        'HTML', 'CSS', 'Tailwind CSS', 'Bootstrap', 'Material-UI',
+        'MongoDB', 'MySQL', 'PostgreSQL', 'SQLite', 'Redis', 'Firebase',
+        'REST API', 'GraphQL', 'Socket.io', 'WebSocket',
+        'AWS', 'Azure', 'Docker', 'Kubernetes', 'Git',
+        'TensorFlow', 'PyTorch', 'Scikit-learn', 'Pandas', 'NumPy',
+        'Jupyter Notebook', 'ipynb', 'Matplotlib', 'Seaborn',
+        'Android', 'iOS', 'Flutter', 'React Native', 'Kotlin', 'Swift',
+        'Unity', 'Unreal Engine', 'Pygame'
+    ];
+
+    // Pre-built tags for quick selection
+    const predefinedTags = [
+        'python', 'java', 'cpp', 'javascript', 'typescript', 'react', 'nodejs',
+        'angular', 'vue', 'django', 'flask', 'spring', 'mern', 'mean',
+        'fullstack', 'frontend', 'backend', 'api', 'rest', 'graphql',
+        'mongodb', 'mysql', 'postgresql', 'firebase', 'aws', 'docker',
+        'machine-learning', 'ai', 'data-science', 'ipynb', 'jupyter',
+        'android', 'ios', 'flutter', 'react-native', 'game', 'unity'
+    ];
+
+    const [currentProject, setCurrentProject] = useState({
+        title: '',
+        description: '',
         githubLink: '',
         zipUrl: '',
         screenshots: '',
-        tags: '',
-        category: 'Web Development'
+        tags: ''
     });
     const navigate = useNavigate();
+
+    // Tag handling functions
+    const handleTagToggle = (tag) => {
+        setSelectedTags(prev => {
+            if (prev.includes(tag)) {
+                return prev.filter(t => t !== tag);
+            } else {
+                return [...prev, tag];
+            }
+        });
+    };
+
+    // Tech Stack handling functions
+    const handleTechStackToggle = (tech) => {
+        setSelectedTechStack(prev => {
+            if (prev.includes(tech)) {
+                return prev.filter(t => t !== tech);
+            } else {
+                return [...prev, tech];
+            }
+        });
+    };
+
+    // File upload handler for ZIP and screenshots
+    const handleFileUpload = async (e, type) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (type === 'zip' && !file.name.endsWith('.zip')) {
+            toast.error('Please upload a ZIP file');
+            return;
+        }
+        if (type === 'screenshot' && !file.type.startsWith('image/')) {
+            toast.error('Please upload an image file');
+            return;
+        }
+
+        setUploadingFiles(true);
+        const formDataFile = new FormData();
+        formDataFile.append('file', file);
+        formDataFile.append('fileType', type);
+
+        try {
+            const { data } = await api.post('/projects/upload', formDataFile, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            if (type === 'zip') {
+                setCurrentProject({ ...currentProject, zipUrl: data.data.url });
+                toast.success('ZIP file uploaded to Cloudinary!');
+            } else if (type === 'screenshot') {
+                setUploadedScreenshots([...uploadedScreenshots, data.data.url]);
+                toast.success('Screenshot uploaded to Cloudinary!');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            toast.error(error.response?.data?.message || 'Upload failed');
+        } finally {
+            setUploadingFiles(false);
+        }
+    };
+
+    const removeScreenshot = (index) => {
+        setUploadedScreenshots(uploadedScreenshots.filter((_, i) => i !== index));
+    };
+
+    const handleCategoryChange = (value) => {
+        if (value === 'Custom') {
+            setSessionDefaults({ ...sessionDefaults, category: customCategory || 'Custom' });
+        } else {
+            setSessionDefaults({ ...sessionDefaults, category: value });
+            setCustomCategory('');
+        }
+    };
 
     const downloadTemplate = async () => {
         try {
@@ -153,28 +265,61 @@ const BulkUpload = () => {
         }
     };
 
+    // Session Defaults Functions
+    const handleSaveDefaults = () => {
+        // Combine selected tech stack with manual input
+        const manualTechStack = sessionDefaults.techStack ? sessionDefaults.techStack.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const combinedTechStack = [...new Set([...selectedTechStack, ...manualTechStack])];
+
+        if (combinedTechStack.length === 0) {
+            toast.error('Tech stack is required. Please select or type at least one technology.');
+            return;
+        }
+
+        // Update session defaults with combined tech stack
+        setSessionDefaults({
+            ...sessionDefaults,
+            techStack: combinedTechStack.join(', ')
+        });
+
+        setDefaultsSet(true);
+        setShowDefaultsSetup(false);
+        toast.success('Session defaults saved! Now you can quickly add projects.');
+    };
+
+    const handleEditDefaults = () => {
+        setShowDefaultsSetup(true);
+        setDefaultsSet(false);
+    };
+
     // Form Mode Functions
     const handleAddProject = () => {
+        if (!defaultsSet) {
+            toast.error('Please set session defaults first');
+            return;
+        }
         setCurrentProject({
             title: '',
             description: '',
-            techStack: '',
-            difficulty: 'Beginner',
-            type: 'free',
-            price: 0,
-            mode: 'github',
             githubLink: '',
             zipUrl: '',
             screenshots: '',
-            tags: '',
-            category: 'Web Development'
+            tags: ''
         });
         setEditingIndex(-1);
         setShowForm(true);
     };
 
     const handleEditProject = (index) => {
-        setCurrentProject(formProjects[index]);
+        const project = formProjects[index];
+        setCurrentProject({
+            title: project.title,
+            description: project.description,
+            githubLink: project.githubLink || '',
+            zipUrl: project.zipUrl || '',
+            screenshots: project.screenshots.join(', '),
+            tags: project.tags.join(', ')
+        });
         setEditingIndex(index);
         setShowForm(true);
     };
@@ -189,18 +334,39 @@ const BulkUpload = () => {
             toast.error('Description must be at least 50 characters');
             return;
         }
-        if (!currentProject.techStack.trim()) {
-            toast.error('Tech stack is required');
+
+        // Mode-specific validation
+        if (sessionDefaults.mode === 'github' && !currentProject.githubLink.trim()) {
+            toast.error('GitHub link is required for GitHub mode');
+            return;
+        }
+        if (sessionDefaults.mode === 'zip' && !currentProject.zipUrl.trim()) {
+            toast.error('ZIP URL is required for ZIP mode');
             return;
         }
 
-        // Convert strings to arrays for API
+        // Merge with session defaults and convert strings to arrays
+        // Combine selected tags with manually typed tags
+        const manualTags = currentProject.tags ? currentProject.tags.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const allTags = [...new Set([...selectedTags, ...manualTags])]; // Remove duplicates
+
+        // Combine uploaded screenshots with manual URLs
+        const manualScreenshots = currentProject.screenshots ? currentProject.screenshots.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const allScreenshots = [...uploadedScreenshots, ...manualScreenshots];
+
         const projectData = {
-            ...currentProject,
-            techStack: currentProject.techStack.split(',').map(s => s.trim()).filter(Boolean),
-            tags: currentProject.tags.split(',').map(s => s.trim()).filter(Boolean),
-            screenshots: currentProject.screenshots.split(',').map(s => s.trim()).filter(Boolean),
-            price: parseInt(currentProject.price) || 0
+            title: currentProject.title,
+            description: currentProject.description,
+            techStack: sessionDefaults.techStack.split(',').map(s => s.trim()).filter(Boolean),
+            difficulty: sessionDefaults.difficulty,
+            type: sessionDefaults.type,
+            price: parseInt(sessionDefaults.price) || 0,
+            mode: sessionDefaults.mode,
+            category: sessionDefaults.category,
+            githubLink: currentProject.githubLink || '',
+            zipUrl: currentProject.zipUrl || '',
+            tags: allTags,
+            screenshots: allScreenshots
         };
 
         if (editingIndex >= 0) {
@@ -219,17 +385,13 @@ const BulkUpload = () => {
         setCurrentProject({
             title: '',
             description: '',
-            techStack: '',
-            difficulty: 'Beginner',
-            type: 'free',
-            price: 0,
-            mode: 'github',
             githubLink: '',
             zipUrl: '',
             screenshots: '',
-            tags: '',
-            category: 'Web Development'
+            tags: ''
         });
+        setSelectedTags([]); // Clear selected tags
+        setUploadedScreenshots([]); // Clear uploaded screenshots
     };
 
     const handleDeleteProject = (index) => {
@@ -299,21 +461,227 @@ const BulkUpload = () => {
                 {/* Form Mode */}
                 {mode === 'form' && (
                     <div className="space-y-6">
+                        {/* Session Defaults Setup */}
+                        {showDefaultsSetup && (
+                            <Card className="border-2 border-blue-500 shadow-lg">
+                                <CardHeader className="bg-blue-50 dark:bg-blue-950/20">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Settings className="h-5 w-5 text-blue-600" />
+                                        {defaultsSet ? 'Edit Session Defaults' : 'Set Session Defaults'}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Set these values once, then quickly add multiple projects with just title, description, and uploads
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="pt-6 space-y-4">
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {/* Category */}
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Category *</label>
+                                            <select
+                                                value={customCategory ? 'Custom' : sessionDefaults.category}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    if (value === 'Custom') {
+                                                        // Don't change category yet, wait for custom input
+                                                        setSessionDefaults({ ...sessionDefaults, category: 'Custom' });
+                                                    } else {
+                                                        setSessionDefaults({ ...sessionDefaults, category: value });
+                                                        setCustomCategory('');
+                                                    }
+                                                }}
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                <option value="Web Development">Web Development</option>
+                                                <option value="Mobile App">Mobile App</option>
+                                                <option value="Python">Python Projects</option>
+                                                <option value="Java">Java Projects</option>
+                                                <option value="C++">C++ Projects</option>
+                                                <option value="Data Science">Data Science</option>
+                                                <option value="Machine Learning">Machine Learning</option>
+                                                <option value="Game Development">Game Development</option>
+                                                <option value="Desktop App">Desktop App</option>
+                                                <option value="DevOps">DevOps</option>
+                                                <option value="Other">Other</option>
+                                                <option value="Custom">✏️ Custom (Type your own)</option>
+                                            </select>
+                                            {sessionDefaults.category === 'Custom' && (
+                                                <div className="mt-2">
+                                                    <input
+                                                        type="text"
+                                                        value={customCategory}
+                                                        onChange={(e) => {
+                                                            setCustomCategory(e.target.value);
+                                                            setSessionDefaults({ ...sessionDefaults, category: e.target.value });
+                                                        }}
+                                                        className="w-full p-3 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Enter custom category name..."
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Difficulty */}
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Difficulty Level *</label>
+                                            <select
+                                                value={sessionDefaults.difficulty}
+                                                onChange={(e) => setSessionDefaults({ ...sessionDefaults, difficulty: e.target.value })}
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                <option value="Beginner">Beginner</option>
+                                                <option value="Intermediate">Intermediate</option>
+                                                <option value="Advanced">Advanced</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid md:grid-cols-3 gap-4">
+                                        {/* Type */}
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Project Type *</label>
+                                            <select
+                                                value={sessionDefaults.type}
+                                                onChange={(e) => setSessionDefaults({ ...sessionDefaults, type: e.target.value })}
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                <option value="free">Free</option>
+                                                <option value="paid">Paid</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Price */}
+                                        {sessionDefaults.type === 'paid' && (
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">Price (₹) *</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={sessionDefaults.price}
+                                                    onChange={(e) => setSessionDefaults({ ...sessionDefaults, price: e.target.value })}
+                                                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                                    placeholder="Enter price"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Mode */}
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Upload Mode *</label>
+                                            <select
+                                                value={sessionDefaults.mode}
+                                                onChange={(e) => setSessionDefaults({ ...sessionDefaults, mode: e.target.value })}
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                            >
+                                                <option value="github">GitHub Link</option>
+                                                <option value="zip">ZIP File</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Tech Stack */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Tech Stack *</label>
+
+                                        {/* Pre-built Tech Stack */}
+                                        <div className="mb-3 p-4 border border-gray-300 rounded-md bg-gray-50 dark:bg-gray-900">
+                                            <p className="text-xs text-muted-foreground mb-2">🔧 Quick Select Tech Stack:</p>
+                                            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                                                {predefinedTechStack.map((tech) => (
+                                                    <button
+                                                        key={tech}
+                                                        type="button"
+                                                        onClick={() => handleTechStackToggle(tech)}
+                                                        className={`px-3 py-1 text-xs rounded-full transition-colors ${selectedTechStack.includes(tech)
+                                                            ? 'bg-green-500 text-white'
+                                                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                                            }`}
+                                                    >
+                                                        {tech}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Manual Tech Stack Input */}
+                                        <input
+                                            type="text"
+                                            value={sessionDefaults.techStack}
+                                            onChange={(e) => setSessionDefaults({ ...sessionDefaults, techStack: e.target.value })}
+                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Or type custom tech stack (comma separated): React, API, etc."
+                                        />
+
+                                        {selectedTechStack.length > 0 && (
+                                            <div className="mt-2 text-sm text-green-600">
+                                                ✓ Selected: {selectedTechStack.join(', ')}
+                                            </div>
+                                        )}
+
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                            💡 This will be applied to all projects you add in this session
+                                        </p>
+                                    </div>
+
+                                    {/* Summary */}
+                                    <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200">
+                                        <h4 className="font-semibold text-sm mb-2">Session Summary:</h4>
+                                        <div className="text-sm space-y-1">
+                                            <p>📁 <strong>Category:</strong> {sessionDefaults.category}</p>
+                                            <p>📊 <strong>Difficulty:</strong> {sessionDefaults.difficulty}</p>
+                                            <p>💰 <strong>Type:</strong> {sessionDefaults.type} {sessionDefaults.type === 'paid' && `(₹${sessionDefaults.price})`}</p>
+                                            <p>📤 <strong>Mode:</strong> {sessionDefaults.mode === 'github' ? 'GitHub Link' : 'ZIP File'}</p>
+                                            <p>🔧 <strong>Tech:</strong> {sessionDefaults.techStack || 'Not set'}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-4">
+                                        <Button onClick={handleSaveDefaults} className="flex items-center gap-2">
+                                            <Save className="h-4 w-4" />
+                                            {defaultsSet ? 'Update Defaults' : 'Save Defaults & Start Adding'}
+                                        </Button>
+                                        {defaultsSet && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setShowDefaultsSetup(false)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Form Mode Header */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-                                    <span>Add Projects ({formProjects.length})</span>
-                                    <Button onClick={handleAddProject} className="flex items-center gap-2">
-                                        <Plus className="h-4 w-4" />
-                                        Add New Project
-                                    </Button>
-                                </CardTitle>
-                                <CardDescription>
-                                    Add projects one by one using the form below
-                                </CardDescription>
-                            </CardHeader>
-                        </Card>
+                        {defaultsSet && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between flex-wrap gap-2">
+                                        <span>Quick Add Projects ({formProjects.length})</span>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                onClick={handleEditDefaults}
+                                                variant="outline"
+                                                size="sm"
+                                                className="flex items-center gap-2"
+                                            >
+                                                <Settings className="h-4 w-4" />
+                                                Edit Defaults
+                                            </Button>
+                                            <Button onClick={handleAddProject} className="flex items-center gap-2">
+                                                <Plus className="h-4 w-4" />
+                                                Add Project
+                                            </Button>
+                                        </div>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Current defaults: {sessionDefaults.category} • {sessionDefaults.difficulty} • {sessionDefaults.type} • {sessionDefaults.mode}
+                                    </CardDescription>
+                                </CardHeader>
+                            </Card>
+                        )}
 
                         {/* Project List */}
                         {formProjects.length > 0 && (
@@ -374,44 +742,26 @@ const BulkUpload = () => {
 
                         {/* Project Form Modal */}
                         {showForm && (
-                            <Card className="border-2 border-blue-200">
-                                <CardHeader>
-                                    <CardTitle>
-                                        {editingIndex >= 0 ? 'Edit Project' : 'Add New Project'}
+                            <Card className="border-2 border-green-200 shadow-lg">
+                                <CardHeader className="bg-green-50 dark:bg-green-950/20">
+                                    <CardTitle className="flex items-center gap-2">
+                                        {editingIndex >= 0 ? '✏️ Edit Project' : '➕ Add New Project'}
                                     </CardTitle>
+                                    <CardDescription>
+                                        Only fill project-specific details. Defaults will be applied automatically.
+                                    </CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        {/* Title */}
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Project Title *</label>
-                                            <input
-                                                type="text"
-                                                value={currentProject.title}
-                                                onChange={(e) => setCurrentProject({ ...currentProject, title: e.target.value })}
-                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                                placeholder="Enter project title"
-                                            />
-                                        </div>
-
-                                        {/* Category */}
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Category *</label>
-                                            <select
-                                                value={currentProject.category}
-                                                onChange={(e) => setCurrentProject({ ...currentProject, category: e.target.value })}
-                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                <option value="Web Development">Web Development</option>
-                                                <option value="Mobile App">Mobile App</option>
-                                                <option value="Data Science">Data Science</option>
-                                                <option value="Machine Learning">Machine Learning</option>
-                                                <option value="Game Development">Game Development</option>
-                                                <option value="Desktop App">Desktop App</option>
-                                                <option value="DevOps">DevOps</option>
-                                                <option value="Other">Other</option>
-                                            </select>
-                                        </div>
+                                <CardContent className="pt-6 space-y-4">
+                                    {/* Title */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Project Title *</label>
+                                        <input
+                                            type="text"
+                                            value={currentProject.title}
+                                            onChange={(e) => setCurrentProject({ ...currentProject, title: e.target.value })}
+                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                                            placeholder="Enter project title"
+                                        />
                                     </div>
 
                                     {/* Description */}
@@ -420,7 +770,7 @@ const BulkUpload = () => {
                                         <textarea
                                             value={currentProject.description}
                                             onChange={(e) => setCurrentProject({ ...currentProject, description: e.target.value })}
-                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
                                             placeholder="Detailed project description..."
                                             rows={4}
                                         />
@@ -429,122 +779,164 @@ const BulkUpload = () => {
                                         </div>
                                     </div>
 
-                                    <div className="grid md:grid-cols-3 gap-4">
-                                        {/* Difficulty */}
+                                    {/* Mode-Based Upload */}
+                                    {sessionDefaults.mode === 'github' ? (
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Difficulty *</label>
-                                            <select
-                                                value={currentProject.difficulty}
-                                                onChange={(e) => setCurrentProject({ ...currentProject, difficulty: e.target.value })}
-                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                <option value="Beginner">Beginner</option>
-                                                <option value="Intermediate">Intermediate</option>
-                                                <option value="Advanced">Advanced</option>
-                                            </select>
-                                        </div>
-
-                                        {/* Type */}
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Type *</label>
-                                            <select
-                                                value={currentProject.type}
-                                                onChange={(e) => setCurrentProject({ ...currentProject, type: e.target.value })}
-                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                <option value="free">Free</option>
-                                                <option value="paid">Paid</option>
-                                            </select>
-                                        </div>
-
-                                        {/* Price */}
-                                        {currentProject.type === 'paid' && (
-                                            <div>
-                                                <label className="block text-sm font-medium mb-1">Price (₹) *</label>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={currentProject.price}
-                                                    onChange={(e) => setCurrentProject({ ...currentProject, price: e.target.value })}
-                                                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                                    placeholder="Enter price"
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Mode */}
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Mode *</label>
-                                            <select
-                                                value={currentProject.mode}
-                                                onChange={(e) => setCurrentProject({ ...currentProject, mode: e.target.value })}
-                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                            >
-                                                <option value="github">GitHub Link</option>
-                                                <option value="zip">ZIP File</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    {/* GitHub/ZIP URL */}
-                                    {currentProject.mode === 'github' ? (
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">GitHub Link *</label>
+                                            <label className="block text-sm font-medium mb-1">GitHub Repository Link *</label>
                                             <input
                                                 type="url"
                                                 value={currentProject.githubLink}
                                                 onChange={(e) => setCurrentProject({ ...currentProject, githubLink: e.target.value })}
-                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
                                                 placeholder="https://github.com/username/repo"
                                             />
                                         </div>
                                     ) : (
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">ZIP URL *</label>
-                                            <input
-                                                type="url"
-                                                value={currentProject.zipUrl}
-                                                onChange={(e) => setCurrentProject({ ...currentProject, zipUrl: e.target.value })}
-                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                                placeholder="https://res.cloudinary.com/..."
-                                            />
+                                            <label className="block text-sm font-medium mb-1">Upload ZIP File *</label>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="file"
+                                                        accept=".zip"
+                                                        onChange={(e) => handleFileUpload(e, 'zip')}
+                                                        className="hidden"
+                                                        id="zip-upload"
+                                                        disabled={uploadingFiles}
+                                                    />
+                                                    <label
+                                                        htmlFor="zip-upload"
+                                                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        <Upload className="h-4 w-4" />
+                                                        {uploadingFiles ? 'Uploading...' : 'Choose ZIP File'}
+                                                    </label>
+                                                </div>
+                                                {currentProject.zipUrl && (
+                                                    <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 rounded-md">
+                                                        <CheckCircle className="h-4 w-4 text-green-600" />
+                                                        <span className="text-sm text-green-600">ZIP file uploaded successfully!</span>
+                                                    </div>
+                                                )}
+                                                <input
+                                                    type="url"
+                                                    value={currentProject.zipUrl}
+                                                    onChange={(e) => setCurrentProject({ ...currentProject, zipUrl: e.target.value })}
+                                                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                                                    placeholder="Or paste Cloudinary URL manually"
+                                                />
+                                            </div>
                                         </div>
                                     )}
 
-                                    {/* Tech Stack */}
+                                    {/* Screenshots */}
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Tech Stack * (comma separated)</label>
-                                        <input
-                                            type="text"
-                                            value={currentProject.techStack}
-                                            onChange={(e) => setCurrentProject({ ...currentProject, techStack: e.target.value })}
-                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                            placeholder="React, Node.js, MongoDB"
-                                        />
+                                        <label className="block text-sm font-medium mb-1">Screenshots</label>
+                                        <div className="space-y-3">
+                                            {/* File Upload Button */}
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => handleFileUpload(e, 'screenshot')}
+                                                    className="hidden"
+                                                    id="screenshot-upload"
+                                                    disabled={uploadingFiles}
+                                                />
+                                                <label
+                                                    htmlFor="screenshot-upload"
+                                                    className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 cursor-pointer disabled:opacity-50"
+                                                >
+                                                    <Image className="h-4 w-4" />
+                                                    {uploadingFiles ? 'Uploading...' : 'Upload Screenshot'}
+                                                </label>
+                                                <span className="text-sm text-muted-foreground">Click to upload images to Cloudinary</span>
+                                            </div>
+
+                                            {/* Display Uploaded Screenshots */}
+                                            {uploadedScreenshots.length > 0 && (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {uploadedScreenshots.map((url, index) => (
+                                                        <div key={index} className="relative group">
+                                                            <img
+                                                                src={url}
+                                                                alt={`Screenshot ${index + 1}`}
+                                                                className="w-full h-24 object-cover rounded-md border"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeScreenshot(index)}
+                                                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Manual URL Input */}
+                                            <input
+                                                type="text"
+                                                value={currentProject.screenshots}
+                                                onChange={(e) => setCurrentProject({ ...currentProject, screenshots: e.target.value })}
+                                                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                                                placeholder="Or paste URLs (comma separated): https://image1.jpg, https://image2.jpg"
+                                            />
+                                        </div>
                                     </div>
 
                                     {/* Tags */}
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Tags (comma separated)</label>
+                                        <label className="block text-sm font-medium mb-1">Tags</label>
+
+                                        {/* Pre-built Tags */}
+                                        <div className="mb-3 p-4 border border-gray-300 rounded-md bg-gray-50 dark:bg-gray-900">
+                                            <p className="text-xs text-muted-foreground mb-2">🏷️ Quick Select Tags:</p>
+                                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                                                {predefinedTags.map((tag) => (
+                                                    <button
+                                                        key={tag}
+                                                        type="button"
+                                                        onClick={() => handleTagToggle(tag)}
+                                                        className={`px-3 py-1 text-xs rounded-full transition-colors ${selectedTags.includes(tag)
+                                                            ? 'bg-blue-500 text-white'
+                                                            : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                                            }`}
+                                                    >
+                                                        {tag}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Manual Tag Input */}
                                         <input
                                             type="text"
                                             value={currentProject.tags}
                                             onChange={(e) => setCurrentProject({ ...currentProject, tags: e.target.value })}
-                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                            placeholder="react, fullstack, mongodb"
+                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+                                            placeholder="Or type custom tags (comma separated): react, api, etc."
                                         />
+
+                                        {selectedTags.length > 0 && (
+                                            <div className="mt-2 text-sm text-blue-600">
+                                                ✓ Selected: {selectedTags.join(', ')}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Screenshots */}
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">Screenshots (comma separated URLs)</label>
-                                        <input
-                                            type="text"
-                                            value={currentProject.screenshots}
-                                            onChange={(e) => setCurrentProject({ ...currentProject, screenshots: e.target.value })}
-                                            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                                            placeholder="https://image1.jpg, https://image2.jpg"
-                                        />
+                                    {/* Preview Applied Defaults */}
+                                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border">
+                                        <h4 className="font-semibold text-sm mb-2">📋 Defaults Applied:</h4>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                            <div><span className="text-muted-foreground">Category:</span> <strong>{sessionDefaults.category}</strong></div>
+                                            <div><span className="text-muted-foreground">Difficulty:</span> <strong>{sessionDefaults.difficulty}</strong></div>
+                                            <div><span className="text-muted-foreground">Type:</span> <strong>{sessionDefaults.type}</strong></div>
+                                            <div><span className="text-muted-foreground">Price:</span> <strong>₹{sessionDefaults.price}</strong></div>
+                                            <div><span className="text-muted-foreground">Mode:</span> <strong>{sessionDefaults.mode}</strong></div>
+                                            <div><span className="text-muted-foreground">Tech:</span> <strong>{sessionDefaults.techStack}</strong></div>
+                                        </div>
                                     </div>
 
                                     {/* Form Actions */}
