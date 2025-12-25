@@ -10,12 +10,6 @@ const __dirname = path.dirname(__filename);
 // Load .env file with explicit path
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-// Debug: Check if .env file is being loaded
-console.log('🔧 Environment Variables Check:');
-console.log('CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME ? '✅ Set' : '❌ Missing');
-console.log('CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY ? '✅ Set' : '❌ Missing');
-console.log('CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET ? '✅ Set' : '❌ Missing');
-console.log('GROQ_API_KEY:', process.env.GROQ_API_KEY ? '✅ Set' : '❌ Missing');
 
 // Verify critical environment variables are loaded
 if (!process.env.CLOUDINARY_API_KEY) {
@@ -82,8 +76,6 @@ app.use(compression());
 const allowedOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
     : ['http://localhost:5173'];
-
-console.log('🌐 Allowed CORS Origins:', allowedOrigins);
 
 app.use(
     cors({

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '../components/ui/Button';
 import { ArrowRight, Code2, Shield, Zap, Sparkles, TrendingUp, Users, Download, Heart, Search, Rocket, BookOpen, GitBranch, Package, Star, Boxes, Wand2, CheckCircle, Brain, Layers, Workflow, Terminal, Instagram, Youtube, Linkedin, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -10,7 +11,11 @@ const Home = () => {
 
     // Scroll to top on component mount
     useEffect(() => {
-        window.scrollTo(0, 0);
+        try {
+            window.scrollTo(0, 0);
+        } catch (err) {
+            console.error('Scroll error:', err);
+        }
     }, []);
 
     // Check backend status
@@ -37,7 +42,7 @@ const Home = () => {
                 } else {
                     setBackendStatus('disconnected');
                 }
-            } catch (error) {
+            } catch (_error) {
                 // Retry if we haven't exceeded max retries
                 if (retryCount < maxRetries) {
                     retryCount++;
@@ -47,6 +52,7 @@ const Home = () => {
                 } else {
                     setBackendStatus('disconnected');
                 }
+                // Don't set error state for backend status check failures
             }
         };
 
@@ -96,6 +102,52 @@ const Home = () => {
 
     return (
         <div className="w-full overflow-x-hidden">
+            {/* SEO Meta Tags */}
+            <Helmet>
+                <title>ProjectHub - Download 1000+ Free & Premium Projects | Learn by Building</title>
+                <meta name="description" content="Access 1000+ production-ready projects with AI-powered guidance. Learn web development, mobile apps, and more with source code downloads. Free and premium projects available." />
+                <meta name="keywords" content="project download, source code, web development projects, mobile app projects, free projects, premium projects, coding tutorials, learn programming, github projects, project hub" />
+                <link rel="canonical" href="https://projecthub.diksuchiedtech.in" />
+
+                {/* Open Graph / Facebook */}
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content="https://projecthub.diksuchiedtech.in" />
+                <meta property="og:title" content="ProjectHub - Download 1000+ Free & Premium Projects" />
+                <meta property="og:description" content="Access production-ready projects with AI-powered guidance. Build real applications and accelerate your learning." />
+                <meta property="og:image" content="https://projecthub.diksuchiedtech.in/og-image.jpg" />
+
+                {/* Twitter */}
+                <meta property="twitter:card" content="summary_large_image" />
+                <meta property="twitter:url" content="https://projecthub.diksuchiedtech.in" />
+                <meta property="twitter:title" content="ProjectHub - Download 1000+ Free & Premium Projects" />
+                <meta property="twitter:description" content="Access production-ready projects with AI-powered guidance. Build real applications and accelerate your learning." />
+                <meta property="twitter:image" content="https://projecthub.diksuchiedtech.in/og-image.jpg" />
+
+                {/* Structured Data */}
+                <script type="application/ld+json">
+                    {JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "WebSite",
+                        "name": "ProjectHub",
+                        "description": "Download 1000+ production-ready projects with AI-powered guidance",
+                        "url": "https://projecthub.diksuchiedtech.in",
+                        "potentialAction": {
+                            "@type": "SearchAction",
+                            "target": "https://projecthub.diksuchiedtech.in/projects?search={search_term_string}",
+                            "query-input": "required name=search_term_string"
+                        },
+                        "publisher": {
+                            "@type": "Organization",
+                            "name": "Diksuchi EdTech",
+                            "logo": {
+                                "@type": "ImageObject",
+                                "url": "https://projecthub.diksuchiedtech.in/logo.png"
+                            }
+                        }
+                    })}
+                </script>
+            </Helmet>
+
             {/* Hero Section - Completely Redesigned */}
             <section className="relative min-h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] flex items-center justify-center overflow-x-hidden bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/30 transition-colors duration-200">
                 {/* Animated Background Elements */}

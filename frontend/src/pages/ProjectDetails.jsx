@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import api from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Card, CardContent } from '../components/ui/Card';
-import { Download, Star, Eye, Github, FileArchive, Heart, ArrowLeft } from 'lucide-react';
+import { Download, Star, Eye, Github, FileArchive, Heart, ArrowLeft, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/authStore';
 import DownloadModal from '../components/DownloadModal';
@@ -16,6 +17,7 @@ const ProjectDetails = () => {
     const { user } = useAuthStore();
     const [project, setProject] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [isFavorite, setIsFavorite] = useState(false);
     const [checkingFavorite, setCheckingFavorite] = useState(true);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -25,6 +27,8 @@ const ProjectDetails = () => {
     const [hoveredRating, setHoveredRating] = useState(0);
     const [comment, setComment] = useState('');
     const [submittingReview, setSubmittingReview] = useState(false);
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
@@ -37,6 +41,7 @@ const ProjectDetails = () => {
                 });
                 if (isMounted) {
                     setProject(data.data.project);
+                    setError(null);
                 }
             } catch (error) {
                 if (error.name === 'AbortError' || error.name === 'CanceledError') {
@@ -44,6 +49,7 @@ const ProjectDetails = () => {
                 }
                 console.error('Error fetching project:', error);
                 if (isMounted) {
+                    setError(error.response?.data?.message || 'Failed to load project');
                     toast.error('Failed to load project');
                 }
             } finally {
@@ -184,6 +190,23 @@ const ProjectDetails = () => {
         }
     };
 
+    const handleImageClick = (index) => {
+        setCurrentImageIndex(index);
+        setShowImageModal(true);
+    };
+
+    const nextImage = () => {
+        setCurrentImageIndex((prev) =>
+            prev === project.screenshots.length - 1 ? 0 : prev + 1
+        );
+    };
+
+    const prevImage = () => {
+        setCurrentImageIndex((prev) =>
+            prev === 0 ? project.screenshots.length - 1 : prev - 1
+        );
+    };
+
     const handleSubmitReview = async (e) => {
         e.preventDefault();
 
@@ -224,26 +247,101 @@ const ProjectDetails = () => {
 
     if (loading) {
         return (
-            <div className="container mx-auto px-4 py-12 text-center">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-                <p className="mt-4 text-gray-600 dark:text-gray-400">Loading project...</p>
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f8faf9] via-white to-[#d8e2dc]/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+                <div className="text-center">
+                    <div className="animate-spin h-12 w-12 border-4 border-[#2d6a4f] border-t-transparent rounded-full mx-auto"></div>
+                    <p className="mt-4 text-gray-600 dark:text-gray-400 font-medium">Loading project...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f8faf9] via-white to-[#d8e2dc]/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+                <div className="container mx-auto px-4 py-12 text-center">
+                    <div className="max-w-md mx-auto">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Unable to Load Project</h2>
+                        <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+                        <div className="flex gap-4 justify-center">
+                            <Button onClick={() => navigate(-1)} variant="outline">
+                                Go Back
+                            </Button>
+                            <Button onClick={() => navigate('/projects')}>
+                                Browse Projects
+                            </Button>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
 
     if (!project) {
         return (
-            <div className="container mx-auto px-4 py-12 text-center">
-                <p className="text-gray-600 dark:text-gray-400">Project not found</p>
-                <Button onClick={() => window.history.back()} className="mt-4">
-                    Go Back
-                </Button>
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f8faf9] via-white to-[#d8e2dc]/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+                <div className="container mx-auto px-4 py-12 text-center">
+                    <p className="text-gray-600 dark:text-gray-400">Project not found</p>
+                    <Button onClick={() => navigate('/projects')} className="mt-4">
+                        Browse Projects
+                    </Button>
+                </div>
             </div>
         );
     }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#f8faf9] via-white to-[#d8e2dc]/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+            {/* SEO Meta Tags */}
+            <Helmet>
+                <title>{project.title} - ProjectHub | Download Free & Premium Projects</title>
+                <meta name="description" content={`${project.description} Download this ${project.difficulty} level ${project.category} project. Built with ${project.techStack?.slice(0, 3).join(', ')}. ${project.type === 'free' ? 'Free to download' : 'Premium project'}.`} />
+                <meta name="keywords" content={`${project.title}, ${project.category}, ${project.techStack?.join(', ')}, ${project.difficulty}, project download, source code, ${project.type} project`} />
+
+                {/* Open Graph / Facebook */}
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content={`https://projecthub.diksuchiedtech.in/project/${project._id}`} />
+                <meta property="og:title" content={`${project.title} - ProjectHub`} />
+                <meta property="og:description" content={project.description} />
+                <meta property="og:image" content={project.screenshots?.[0] || 'https://projecthub.diksuchiedtech.in/og-image.jpg'} />
+
+                {/* Twitter */}
+                <meta property="twitter:card" content="summary_large_image" />
+                <meta property="twitter:url" content={`https://projecthub.diksuchiedtech.in/project/${project._id}`} />
+                <meta property="twitter:title" content={`${project.title} - ProjectHub`} />
+                <meta property="twitter:description" content={project.description} />
+                <meta property="twitter:image" content={project.screenshots?.[0] || 'https://projecthub.diksuchiedtech.in/og-image.jpg'} />
+
+                {/* Structured Data for SEO */}
+                <script type="application/ld+json">
+                    {JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "SoftwareApplication",
+                        "name": project.title,
+                        "description": project.description,
+                        "applicationCategory": project.category,
+                        "offers": {
+                            "@type": "Offer",
+                            "price": project.type === 'free' ? "0" : project.price || "0",
+                            "priceCurrency": "INR"
+                        },
+                        "aggregateRating": {
+                            "@type": "AggregateRating",
+                            "ratingValue": project.rating || 0,
+                            "reviewCount": project.reviewCount || 0
+                        },
+                        "operatingSystem": "Cross-platform",
+                        "downloadUrl": `https://projecthub.diksuchiedtech.in/project/${project._id}`,
+                        "screenshot": project.screenshots?.[0],
+                        "softwareVersion": "1.0",
+                        "author": {
+                            "@type": "Organization",
+                            "name": "Diksuchi EdTech"
+                        }
+                    })}
+                </script>
+            </Helmet>
+
             {/* Hero Section */}
             <div>
                 <div className="container mx-auto px-6 py-12">
@@ -336,12 +434,18 @@ const ProjectDetails = () => {
 
                         {/* Right: Screenshot */}
                         <div className="lg:col-span-3 relative">
-                            <div className="rounded-3xl overflow-hidden border-4 border-gray-900/20 dark:border-white/20 shadow-2xl backdrop-blur-sm">
+                            <div
+                                className="rounded-3xl overflow-hidden border-4 border-gray-900/20 dark:border-white/20 shadow-2xl backdrop-blur-sm cursor-pointer group"
+                                onClick={() => handleImageClick(0)}
+                            >
                                 <img
                                     src={project.screenshots?.[0] || 'https://via.placeholder.com/800x600'}
                                     alt={project.title}
-                                    className="w-full h-[400px] object-cover transform hover:scale-110 transition-transform duration-500"
+                                    className="w-full h-[400px] object-cover transform group-hover:scale-110 transition-transform duration-500"
                                 />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                                    <span className="text-white text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 px-4 py-2 rounded-full">Click to enlarge</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -596,6 +700,97 @@ const ProjectDetails = () => {
                 projectTitle={project.title}
                 onDownloadComplete={performDownload}
             />
+
+            {/* Image Lightbox Modal */}
+            {showImageModal && project.screenshots && project.screenshots.length > 0 && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+                    onClick={() => setShowImageModal(false)}
+                >
+                    {/* Close Button */}
+                    <button
+                        onClick={() => setShowImageModal(false)}
+                        className="absolute top-4 right-4 z-50 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"
+                        aria-label="Close"
+                    >
+                        <X className="h-6 w-6 text-white" />
+                    </button>
+
+                    {/* Previous Button */}
+                    {project.screenshots.length > 1 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                prevImage();
+                            }}
+                            className="absolute left-4 z-50 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"
+                            aria-label="Previous image"
+                        >
+                            <ChevronLeft className="h-6 w-6 text-white" />
+                        </button>
+                    )}
+
+                    {/* Image Container */}
+                    <div
+                        className="max-w-7xl max-h-[90vh] w-full px-16"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <img
+                            src={project.screenshots[currentImageIndex]}
+                            alt={`${project.title} - Screenshot ${currentImageIndex + 1}`}
+                            className="w-full h-full object-contain rounded-lg"
+                        />
+
+                        {/* Image Counter */}
+                        {project.screenshots.length > 1 && (
+                            <div className="text-center mt-4">
+                                <span className="text-white text-sm font-medium bg-black/50 px-4 py-2 rounded-full">
+                                    {currentImageIndex + 1} / {project.screenshots.length}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Next Button */}
+                    {project.screenshots.length > 1 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                nextImage();
+                            }}
+                            className="absolute right-4 z-50 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"
+                            aria-label="Next image"
+                        >
+                            <ChevronRight className="h-6 w-6 text-white" />
+                        </button>
+                    )}
+
+                    {/* Thumbnail Navigation */}
+                    {project.screenshots.length > 1 && (
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 max-w-full overflow-x-auto px-4">
+                            {project.screenshots.map((screenshot, index) => (
+                                <button
+                                    key={index}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCurrentImageIndex(index);
+                                    }}
+                                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${index === currentImageIndex
+                                            ? 'border-white scale-110'
+                                            : 'border-white/30 hover:border-white/60'
+                                        }`}
+                                >
+                                    <img
+                                        src={screenshot}
+                                        alt={`Thumbnail ${index + 1}`}
+                                        className="w-full h-full object-cover"
+                                    />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

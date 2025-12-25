@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
 import Navbar from './components/Navbar';
@@ -6,6 +6,7 @@ import Footer from './components/Footer';
 import ErrorBoundary from './components/ErrorBoundary';
 import DiksuchAI from './components/DiksuchAI';
 import { useAuthStore } from './store/authStore';
+import { Button } from './components/ui/Button';
 
 // Scroll to top component
 const ScrollToTop = () => {
@@ -68,8 +69,6 @@ import Support from './pages/Support';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-  const { isAuthenticated } = useAuthStore();
-
   return (
     <Router
       future={{
@@ -177,6 +176,21 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+              {/* Catch-all route for 404 */}
+              <Route path="*" element={
+                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800">
+                  <div className="text-center px-4">
+                    <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4">404</h1>
+                    <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">Page not found</p>
+                    <Link to="/">
+                      <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white">
+                        Go Home
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              } />
             </Routes>
           </main>
         </ErrorBoundary>

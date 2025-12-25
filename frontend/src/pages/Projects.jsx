@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import api from '../lib/api';
 import ProjectCard from '../components/ProjectCard';
 import ProjectCardList from '../components/ProjectCardList';
@@ -12,7 +13,7 @@ import { useAuthStore } from '../store/authStore';
 
 const Projects = () => {
     const { user } = useAuthStore();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [projects, setProjects] = useState([]);
     const [allProjects, setAllProjects] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -25,11 +26,12 @@ const Projects = () => {
         type: searchParams.get('type') || '',
         category: searchParams.get('category') || '',
     });
-    const [currentPage, setCurrentPage] = useState(1);
+    const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page')) || 1);
     const searchInputRef = useRef(null);
 
     // Fetch all projects initially
     const fetchAllProjects = useCallback(async () => {
+        let isMounted = true;
         setLoading(true);
         try {
             const [projectsRes, favoritesRes] = await Promise.all([
@@ -37,14 +39,22 @@ const Projects = () => {
                 user ? api.get('/reviews/favorites/my').catch(() => ({ data: { data: [] } })) : Promise.resolve({ data: { data: [] } })
             ]);
 
-            setAllProjects(projectsRes.data.data.projects);
-            setProjects(projectsRes.data.data.projects);
-            setFavoriteIds(favoritesRes.data.data.map(p => p._id));
+            if (isMounted) {
+                setAllProjects(projectsRes.data.data.projects);
+                setProjects(projectsRes.data.data.projects);
+                setFavoriteIds(favoritesRes.data.data.map(p => p._id));
+            }
         } catch (error) {
             console.error('Error fetching projects:', error);
         } finally {
-            setLoading(false);
+            if (isMounted) {
+                setLoading(false);
+            }
         }
+
+        return () => {
+            isMounted = false;
+        };
     }, [user]);
 
     useEffect(() => {
@@ -136,6 +146,10 @@ const Projects = () => {
 
     const goToPage = (page) => {
         setCurrentPage(page);
+        // Update URL with page number
+        const params = new URLSearchParams(searchParams);
+        params.set('page', page.toString());
+        setSearchParams(params);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -162,6 +176,23 @@ const Projects = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#f8faf9] via-white to-[#d8e2dc]/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+            {/* SEO Meta Tags */}
+            <Helmet>
+                <title>Browse Projects - Free & Premium Source Code | ProjectHub</title>
+                <meta name="description" content="Discover and download from our collection of {projects.length}+ projects. Filter by difficulty, category, and technology stack. Free and premium projects available." />
+                <meta name="keywords" content="browse projects, source code download, web development, mobile apps, free projects, premium projects, coding examples, project templates" />
+                <link rel="canonical" href="https://projecthub.diksuchiedtech.in/projects" />
+
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content="https://projecthub.diksuchiedtech.in/projects" />
+                <meta property="og:title" content="Browse Projects - ProjectHub" />
+                <meta property="og:description" content="Discover and download from our collection of production-ready projects" />
+
+                <meta property="twitter:card" content="summary_large_image" />
+                <meta property="twitter:title" content="Browse Projects - ProjectHub" />
+                <meta property="twitter:description" content="Discover and download from our collection of production-ready projects" />
+            </Helmet>
+
             <div className="container mx-auto px-4 py-4 max-w-9xl">
                 <div className="space-y-4">
                     {/* Search Bar - Top Section - Centered and Small */}
