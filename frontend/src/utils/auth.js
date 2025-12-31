@@ -111,12 +111,13 @@ export const handleCallback = async (code) => {
             throw new Error('Code verifier not found. Please try logging in again.');
         }
 
-        // Exchange authorization code for access token via backend proxy
-        const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-        const tokenEndpoint = `${backendUrl}/oauth/token`;
+        // Call auth server directly (CORS is enabled on auth server)
+        const baseUrl = AUTH_SERVER_URL.replace(/\/$/, '');
+        const tokenEndpoint = `${baseUrl}/api/oauth/token`;
         console.log('🔄 [handleCallback] Exchanging code for token at:', tokenEndpoint);
 
         const requestBody = {
+            grant_type: 'authorization_code',
             code,
             redirect_uri: REDIRECT_URI,
             code_verifier: codeVerifier,
@@ -141,7 +142,7 @@ export const handleCallback = async (code) => {
             try {
                 const error = await response.json();
                 console.error('❌ [handleCallback] Server error response:', error);
-                errorMessage = error.message || error.error || errorMessage;
+                errorMessage = error.error_description || error.error || error.message || errorMessage;
             } catch (e) {
                 // Response wasn't JSON
                 errorMessage = `Server error: ${response.status} ${response.statusText}`;
@@ -153,7 +154,8 @@ export const handleCallback = async (code) => {
         const data = await response.json();
         console.log('📦 [handleCallback] Response data:', JSON.stringify(data, null, 2));
 
-        const { access_token } = data.data;
+        // Auth server returns token directly (not wrapped in data object)
+        const access_token = data.access_token;
         console.log('🎫 [handleCallback] Access token:', access_token ? access_token.substring(0, 30) + '...' : 'MISSING!');
 
         if (!access_token) {
