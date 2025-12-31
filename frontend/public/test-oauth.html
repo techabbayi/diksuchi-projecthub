@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Flow Test - ProjectsHub</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .test-section h2 {
+            color: #333;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 5px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warning { color: #dcdcaa; }
+        .info { color: #9cdcfe; }
+        .log-entry {
+            margin: 5px 0;
+            padding: 8px;
+            background: #2d2d2d;
+            border-left: 3px solid #667eea;
+            border-radius: 4px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-pending { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 OAuth Flow Tester</h1>
+        <p class="subtitle">ProjectsHub → Diksuchi Auth Identity</p>
+
+        <div class="test-section">
+            <h2>📋 Environment Check</h2>
+            <div id="envCheck"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔄 OAuth Flow Actions</h2>
+            <button onclick="startOAuthFlow()">🚀 Start OAuth Login</button>
+            <button onclick="checkStorage()" class="secondary">📦 Check Storage</button>
+            <button onclick="clearStorage()" class="danger">🧹 Clear All Storage</button>
+            <button onclick="testDirectAuth()" class="secondary">🔗 Test Direct Auth</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Live Logs</h2>
+            <div id="logs"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>💾 Storage Contents</h2>
+            <div id="storage"></div>
+        </div>
+    </div>
+
+    <script>
+        const AUTH_SERVER = 'https://diksuchi-auth-identity.vercel.app';
+        const CLIENT_ID = 'projectshub';
+        const REDIRECT_URI = window.location.origin + '/callback';
+
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#9cdcfe',
+                success: '#4ec9b0',
+                error: '#f48771',
+                warning: '#dcdcaa'
+            };
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span style="color: ${colors[type]}">[${timestamp}]</span> ${message}`;
+            logsDiv.appendChild(entry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function base64URLEncode(buffer) {
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+            return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        function generateCodeVerifier() {
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            return base64URLEncode(array);
+        }
+
+        async function generateCodeChallenge(verifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(verifier);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return base64URLEncode(hash);
+        }
+
+        async function startOAuthFlow() {
+            try {
+                log('🚀 Starting OAuth flow...', 'info');
+
+                const codeVerifier = generateCodeVerifier();
+                const codeChallenge = await generateCodeChallenge(codeVerifier);
+                const state = generateCodeVerifier();
+
+                log(`🔐 Generated PKCE parameters`, 'success');
+                log(`   code_verifier: ${codeVerifier.substring(0, 20)}...`, 'info');
+                log(`   code_challenge: ${codeChallenge.substring(0, 20)}...`, 'info');
+
+                sessionStorage.setItem('code_verifier', codeVerifier);
+                sessionStorage.setItem('oauth_state', state);
+                log('💾 Stored parameters in sessionStorage', 'success');
+
+                const params = new URLSearchParams({
+                    response_type: 'code',
+                    client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    code_challenge: codeChallenge,
+                    code_challenge_method: 'S256',
+                    state: state
+                });
+
+                const authUrl = `${AUTH_SERVER}/api/oauth/authorize?${params}`;
+                log(`🔗 Authorization URL: ${authUrl}`, 'info');
+                log('📍 Redirecting in 2 seconds...', 'warning');
+
+                setTimeout(() => {
+                    window.location.href = authUrl;
+                }, 2000);
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function checkStorage() {
+            const storage = {
+                access_token: localStorage.getItem('access_token'),
+                token: localStorage.getItem('token'),
+                code_verifier: sessionStorage.getItem('code_verifier'),
+                oauth_state: sessionStorage.getItem('oauth_state')
+            };
+
+            let html = '<pre>';
+            for (const [key, value] of Object.entries(storage)) {
+                if (value) {
+                    html += `<span class="success">✓</span> ${key}: ${value.substring(0, 30)}...\n`;
+                    log(`✓ ${key} found`, 'success');
+                } else {
+                    html += `<span class="error">✗</span> ${key}: not found\n`;
+                }
+            }
+            html += '</pre>';
+            document.getElementById('storage').innerHTML = html;
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            sessionStorage.clear();
+            log('🧹 All storage cleared', 'success');
+            checkStorage();
+        }
+
+        function testDirectAuth() {
+            log('🔗 Opening auth server in new tab...', 'info');
+            window.open('https://diksuchi-auth-identity.vercel.app/dasauth', '_blank');
+        }
+
+        function checkEnvironment() {
+            const checks = [
+                { name: 'Auth Server', value: AUTH_SERVER, status: 'ok' },
+                { name: 'Client ID', value: CLIENT_ID, status: 'ok' },
+                { name: 'Redirect URI', value: REDIRECT_URI, status: 'ok' },
+                { name: 'HTTPS Support', value: crypto.subtle ? 'Available' : 'Not Available', status: crypto.subtle ? 'ok' : 'error' }
+            ];
+
+            let html = '<pre>';
+            checks.forEach(check => {
+                const badge = check.status === 'ok' ? 
+                    '<span class="status-badge status-ok">OK</span>' :
+                    '<span class="status-badge status-error">ERROR</span>';
+                html += `${check.name}: ${check.value} ${badge}\n`;
+            });
+            html += '</pre>';
+            document.getElementById('envCheck').innerHTML = html;
+        }
+
+        // Initialize
+        window.onload = () => {
+            log('✅ OAuth Test Page loaded', 'success');
+            checkEnvironment();
+            checkStorage();
+        };
+    </script>
+</body>
+</html>

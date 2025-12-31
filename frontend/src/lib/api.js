@@ -12,7 +12,12 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        // Priority: OAuth access_token > regular token
+        // This ensures OAuth tokens are always preferred
+        const oauthToken = localStorage.getItem('access_token');
+        const regularToken = localStorage.getItem('token');
+        const token = oauthToken || regularToken;
+
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -36,9 +41,11 @@ api.interceptors.response.use(
                 toast.error(toastMessage, { duration: 3000 });
             });
 
-            // Clear auth data
+            // Clear both OAuth and regular auth data
+            localStorage.removeItem('access_token');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            sessionStorage.removeItem('code_verifier');
 
             // Delay redirect to allow toast to show
             setTimeout(() => {

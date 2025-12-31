@@ -3,13 +3,39 @@ import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { Button } from './ui/Button';
 import { Moon, Sun, Menu, X, Sparkles, User, LogOut, LayoutGrid, Grid3x3, FileText, HelpCircle, ShieldCheck, UserCircle2, Upload, LayoutDashboard, Code2, Bot } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const Navbar = () => {
     const { user, isAuthenticated, logout } = useAuthStore();
     const { theme, toggleTheme } = useThemeStore();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
+
+    // Handle keyboard navigation for user menu
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (showUserMenu && e.key === 'Escape') {
+                setShowUserMenu(false);
+            }
+        };
+
+        if (showUserMenu) {
+            document.addEventListener('keydown', handleKeyDown);
+            return () => document.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [showUserMenu]);
+
+    // Close menus when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => {
+            if (showUserMenu) setShowUserMenu(false);
+        };
+
+        if (showUserMenu) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [showUserMenu]);
 
     return (
         <nav className="sticky top-0 w-full z-50 border-b border-border/40 bg-[#f8faf9]/80 dark:bg-gray-800 backdrop-blur-xl">
@@ -98,13 +124,23 @@ const Navbar = () => {
                         {isAuthenticated ? (
                             <>
                                 {/* Desktop User Menu */}
-                                <div className="hidden md:flex items-center space-x-2">
-                                    <div >
+                                <div className="hidden relative md:flex items-center space-x-2">
+                                    <div className="relative">
                                         <button
-                                            onClick={() => setShowUserMenu(!showUserMenu)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowUserMenu(!showUserMenu);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    setShowUserMenu(!showUserMenu);
+                                                }
+                                            }}
                                             className="flex items-center space-x-2 px-3 py-2 rounded-xl hover:bg-[#d8e2dc] dark:hover:bg-slate-800 transition-colors"
                                             aria-label="User menu"
                                             aria-expanded={showUserMenu}
+                                            aria-haspopup="true"
                                         >
                                             <div className="w-8 h-8 rounded-full bg-[#2ec4b6] flex items-center justify-center text-[#f8faf9] font-semibold text-sm shadow-md">
                                                 {user?.name?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}
@@ -114,57 +150,85 @@ const Navbar = () => {
 
                                         {showUserMenu && (
                                             <>
-                                                <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)}></div>
                                                 <div
-                                                    className="absolute right-0 mt-3 w-56 bg-[#f8faf9] dark:bg-slate-800 rounded-xl shadow-2xl border border-[#d8e2dc] dark:border-slate-700 z-50"
-                                                    style={{ overflow: 'visible' }}
-                                                >
-                                                    <div className="px-4 py-3 border-b border-[#d8e2dc] dark:border-slate-700">
-                                                        <p className="text-sm font-semibold text-gray-900 dark:text-[#f8faf9] truncate">{user?.name || user?.username}</p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{user?.email}</p>
+                                                    className="fixed inset-0 z-40"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setShowUserMenu(false);
+                                                    }}
+                                                ></div>
+                                                <div className="absolute top-14 -right-2 mt-2 min-w-[320px] bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 z-50 overflow-hidden">
+                                                    {/* User Info Header - Clean and Spacious */}
+                                                    <div className="px-5 py-4 bg-gradient-to-br from-[#2ec4b6]/5 to-[#2d6a4f]/5 dark:from-[#2ec4b6]/10 dark:to-[#2d6a4f]/10 border-b border-gray-100 dark:border-slate-700/50">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#2ec4b6] to-[#2d6a4f] flex items-center justify-center text-white font-bold text-xl shadow-lg ring-2 ring-white dark:ring-slate-800">
+                                                                {user?.name?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-bold text-gray-900 dark:text-white break-words line-clamp-1">
+                                                                    {user?.name || user?.username}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400 break-words line-clamp-1 mt-0.5">
+                                                                    {user?.email}
+                                                                </p>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="py-1">
+
+                                                    {/* Menu Items - Properly Spaced */}
+                                                    <div className="py-2 px-2">
                                                         <Link
                                                             to="/profile"
                                                             onClick={() => setShowUserMenu(false)}
-                                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-[#d8e2dc] dark:hover:bg-[#2d6a4f]/20 transition-colors w-full"
+                                                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-[#2ec4b6]/10 dark:hover:bg-[#2d6a4f]/20 transition-all duration-150 group"
                                                         >
-                                                            <User className="h-4 w-4 shrink-0" />
-                                                            <span className="whitespace-nowrap">Profile Settings</span>
+                                                            <div className="w-9 h-9 rounded-lg bg-[#2ec4b6]/10 dark:bg-[#2ec4b6]/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                <User className="h-4.5 w-4.5 text-[#2ec4b6]" />
+                                                            </div>
+                                                            <span className="flex-1">Profile Settings</span>
                                                         </Link>
                                                         <Link
                                                             to="/privacy-policy"
                                                             onClick={() => setShowUserMenu(false)}
-                                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-[#d8e2dc] dark:hover:bg-[#2d6a4f]/20 transition-colors w-full"
+                                                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-150 group"
                                                         >
-                                                            <ShieldCheck className="h-4 w-4 shrink-0" />
-                                                            <span className="whitespace-nowrap">Privacy Policy</span>
+                                                            <div className="w-9 h-9 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                <ShieldCheck className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                                                            </div>
+                                                            <span className="flex-1">Privacy Policy</span>
                                                         </Link>
                                                         <Link
                                                             to="/terms-conditions"
                                                             onClick={() => setShowUserMenu(false)}
-                                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-[#d8e2dc] dark:hover:bg-[#2d6a4f]/20 transition-colors w-full"
+                                                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-150 group"
                                                         >
-                                                            <FileText className="h-4 w-4 shrink-0" />
-                                                            <span className="whitespace-nowrap">Terms & Conditions</span>
+                                                            <div className="w-9 h-9 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                <FileText className="h-4.5 w-4.5 text-purple-600 dark:text-purple-400" />
+                                                            </div>
+                                                            <span className="flex-1">Terms & Conditions</span>
                                                         </Link>
                                                         <Link
                                                             to="/support"
                                                             onClick={() => setShowUserMenu(false)}
-                                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-[#d8e2dc] dark:hover:bg-[#2d6a4f]/20 transition-colors w-full"
+                                                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all duration-150 group"
                                                         >
-                                                            <HelpCircle className="h-4 w-4 shrink-0" />
-                                                            <span className="whitespace-nowrap">Support</span>
+                                                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                <HelpCircle className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
+                                                            </div>
+                                                            <span className="flex-1">Support</span>
                                                         </Link>
                                                     </div>
-                                                    <div className="border-t border-[#d8e2dc] dark:border-slate-700"></div>
-                                                    <div className="py-1">
+
+                                                    {/* Logout Section - Prominent */}
+                                                    <div className="border-t border-gray-100 dark:border-slate-700/50 p-2">
                                                         <button
                                                             onClick={() => { logout(); setShowUserMenu(false); }}
-                                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-150 group"
                                                         >
-                                                            <LogOut className="h-4 w-4 shrink-0" />
-                                                            <span className="whitespace-nowrap">Logout</span>
+                                                            <div className="w-9 h-9 rounded-lg bg-red-500/10 dark:bg-red-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                                <LogOut className="h-4.5 w-4.5" />
+                                                            </div>
+                                                            <span className="flex-1 text-left">Logout</span>
                                                         </button>
                                                     </div>
                                                 </div>
@@ -206,7 +270,10 @@ const Navbar = () => {
                         <div className="container mx-auto px-4 py-4 space-y-1">
                             {isAuthenticated && (
                                 <>
-                                    <div className="flex items-center space-x-3 px-3 py-3 mb-3 bg-[#d8e2dc] dark:bg-[#2d6a4f]/20 rounded-xl">
+                                    <div
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className="flex items-center space-x-3 px-3 py-3 mb-3 bg-[#d8e2dc] dark:bg-[#2d6a4f]/20 rounded-xl cursor-pointer"
+                                    >
                                         <div className="w-10 h-10 rounded-full bg-[#2ec4b6] flex items-center justify-center text-[#f8faf9] font-semibold shadow-md">
                                             {user?.name?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}
                                         </div>

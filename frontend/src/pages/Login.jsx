@@ -7,6 +7,7 @@ import { Label } from '../components/ui/Label';
 import { Button } from '../components/ui/Button';
 import { GraduationCap, Mail, Lock, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { login as oauthLogin } from '../utils/auth';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -26,6 +27,10 @@ const Login = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleOAuthLogin = () => {
+        oauthLogin();
     };
 
     return (
@@ -150,6 +155,36 @@ const Login = () => {
                                 )}
                             </Button>
                         </form>
+
+                        {/* OAuth Divider */}
+                        <div className="relative my-6">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-gray-300 dark:border-slate-600"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="px-4 bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-400">
+                                    Or continue with
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Diksuchi OAuth Button */}
+                        <Button
+                            type="button"
+                            onClick={handleOAuthLogin}
+                            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/15 hover:shadow-xl hover:shadow-blue-500/20 transition-all"
+                        >
+                            <svg
+                                className="w-5 h-5 mr-2"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" fill="none" />
+                                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            Continue with Diksuchi
+                        </Button>
 
                         <div className="mt-6 text-center">
                             <p className="text-gray-600 dark:text-gray-400">

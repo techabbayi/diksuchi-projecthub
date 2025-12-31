@@ -98,12 +98,36 @@ export const login = async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private
 export const getMe = async (req, res) => {
+
+
     try {
         const user = await User.findById(req.user._id).populate('favorites', 'title screenshots price');
 
-        successResponse(res, 200, 'User profile fetched', user);
+        if (!user) {
+
+            return errorResponse(res, 404, 'User not found');
+        }
+
+
+
+        successResponse(res, 200, 'User profile fetched', {
+            _id: user._id,
+            oauthId: user.oauthId,
+            name: user.name,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            avatar: user.avatar,
+            bio: user.bio,
+            wallet: user.wallet,
+            favorites: user.favorites,
+            isVerified: user.isVerified,
+            purchasedProjects: user.purchasedProjects,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        });
     } catch (error) {
-        console.error('Get me error:', error);
+        console.error('Get user profile error:', error);
         errorResponse(res, 500, error.message);
     }
 };
@@ -123,6 +147,11 @@ export const updateProfile = async (req, res) => {
 
         // Check if email is being changed and if it's already taken
         if (email && email !== user.email) {
+            // Prevent email changes for OAuth users
+            if (user.oauthId) {
+                return errorResponse(res, 400, 'Cannot change email for OAuth users');
+            }
+
             const emailExists = await User.findOne({ email });
             if (emailExists) {
                 return errorResponse(res, 400, 'Email already in use');
@@ -147,6 +176,7 @@ export const updateProfile = async (req, res) => {
 
         successResponse(res, 200, 'Profile updated successfully', {
             _id: user._id,
+            oauthId: user.oauthId,
             name: user.name,
             username: user.username,
             email: user.email,

@@ -8,7 +8,7 @@ import api from '../lib/api';
 import toast from 'react-hot-toast';
 
 const Profile = () => {
-    const { user, updateUser } = useAuthStore();
+    const { user, updateUser, fetchUser } = useAuthStore();
     const [activeTab, setActiveTab] = useState('profile');
 
     // Edit states
@@ -29,6 +29,23 @@ const Profile = () => {
     });
 
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        // Fetch user data on mount to ensure we have latest data
+        const loadUserData = async () => {
+            try {
+                await fetchUser();
+            } catch (error) {
+                console.error('Failed to fetch user:', error);
+                // Redirect to login if user fetch fails (401 or no token)
+                if (error.response?.status === 401 || error.message === 'No authentication token found') {
+                    toast.error('Session expired. Please login again.');
+                    window.location.href = '/login';
+                }
+            }
+        };
+        loadUserData();
+    }, [fetchUser]);
 
     useEffect(() => {
         if (user) {
@@ -55,7 +72,7 @@ const Profile = () => {
             const response = await api.put('/auth/profile', { name: tempName.trim() });
             if (response.data.success) {
                 setName(tempName);
-                updateUser(response.data.user);
+                updateUser(response.data.data);
                 setEditingName(false);
                 toast.success('Name updated successfully!');
             }
@@ -72,6 +89,11 @@ const Profile = () => {
     };
 
     const handleEmailEdit = () => {
+        // Prevent email editing for OAuth users
+        if (user?.oauthId) {
+            toast.error('Cannot change email for OAuth users');
+            return;
+        }
         setTempEmail(email);
         setEditingEmail(true);
     };
@@ -93,7 +115,7 @@ const Profile = () => {
             const response = await api.put('/auth/profile', { email: tempEmail.trim() });
             if (response.data.success) {
                 setEmail(tempEmail);
-                updateUser(response.data.user);
+                updateUser(response.data.data);
                 setEditingEmail(false);
                 toast.success('Email updated successfully!');
             }

@@ -1,29 +1,243 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import User from '../models/User.js';
 
-// Protect routes - verify JWT token
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load RSA public key for OAuth token verification
+const getPublicKey = () => {
+    try {
+        // Priority 1: Environment variable (for production deployment - Vercel, Railway, etc.)
+        // This is the RECOMMENDED way for production
+        if (process.env.DIKSUCHI_PUBLIC_KEY) {
+            let key = process.env.DIKSUCHI_PUBLIC_KEY;
+
+            // Remove surrounding quotes if present
+            key = key.replace(/^["']|["']$/g, '');
+
+            // Replace literal \n with actual newlines (for single-line env vars)
+            key = key.replace(/\\n/g, '\n');
+
+            // Trim whitespace
+            key = key.trim();
+
+            // Validate it's a PEM key
+            if (key.includes('BEGIN PUBLIC KEY')) {
+                try {
+                    // Validate the key by creating a KeyObject
+                    const keyObject = crypto.createPublicKey({
+                        key: key,
+                        format: 'pem'
+                    });
+
+                    // Export back to PEM string for jwt library
+                    const pemKey = keyObject.export({
+                        type: 'spki',
+                        format: 'pem'
+                    });
+
+
+                    return pemKey;
+                } catch (keyError) {
+                    console.error('❌ [getPublicKey] Failed to parse key from environment:', keyError.message);
+                }
+            }
+        }
+
+        // Priority 2: Load from file (for local development only)
+        const keyPath = path.join(__dirname, '../config/diksuchi-public.pem');
+
+        if (fs.existsSync(keyPath)) {
+            const key = fs.readFileSync(keyPath, 'utf8');
+
+            try {
+                // Validate the key by creating a KeyObject
+                const keyObject = crypto.createPublicKey({
+                    key: key,
+                    format: 'pem'
+                });
+
+                // Export back to PEM string for jwt library
+                const pemKey = keyObject.export({
+                    type: 'spki',
+                    format: 'pem'
+                });
+
+
+                return pemKey;
+            } catch (keyError) {
+                console.error('❌ [getPublicKey] Failed to parse key from file:', keyError.message);
+            }
+        }
+
+        console.error('❌ [getPublicKey] No valid public key found');
+        console.error('   Production: Set DIKSUCHI_PUBLIC_KEY environment variable');
+        console.error('   Local Dev: Place key in', keyPath);
+        return null;
+    } catch (error) {
+        console.error('❌ [getPublicKey] Unexpected error:', error.message);
+        return null;
+    }
+};
+
+// Verify OAuth token with RSA public key
+const verifyOAuthToken = (token) => {
+    const publicKey = getPublicKey();
+    if (!publicKey) {
+        throw new Error('Public key not configured');
+    }
+
+    try {
+
+
+        const verified = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
+        return verified;
+    } catch (error) {
+        console.error('❌ [Verify OAuth Token] Verification failed:', error.message);
+        throw error;
+    }
+};
+
+// Sync OAuth user to database
+const syncOAuthUser = async (decoded) => {
+
+
+    try {
+        let user = await User.findOne({ oauthId: decoded.sub });
+
+        if (!user) {
+
+            // Check if user exists by email (might have been created manually)
+            user = await User.findOne({ email: decoded.email });
+
+            if (user) {
+
+                // User exists with this email, just link the OAuth ID
+                user.oauthId = decoded.sub;
+                if (decoded.name) user.name = decoded.name;
+                user.isVerified = true;
+                await user.save();
+
+            } else {
+
+                // Create new user from OAuth data
+                const baseUsername = decoded.email.split('@')[0];
+                let username = baseUsername + '_' + decoded.sub.substring(0, 8);
+
+                // Handle potential username collision with a more unique approach
+                try {
+                    user = await User.create({
+                        oauthId: decoded.sub,
+                        email: decoded.email,
+                        username: username,
+                        name: decoded.name || baseUsername,
+                        role: 'user',
+                        isVerified: true,
+                    });
+
+                } catch (createError) {
+                    // If username collision, try with timestamp
+                    if (createError.code === 11000) {
+
+                        username = baseUsername + '_' + Date.now();
+                        user = await User.create({
+                            oauthId: decoded.sub,
+                            email: decoded.email,
+                            username: username,
+                            name: decoded.name || baseUsername,
+                            role: 'user',
+                            isVerified: true,
+                        });
+
+                    } else {
+                        throw createError;
+                    }
+                }
+            }
+        } else {
+
+            // Update existing user data
+            if (decoded.email && user.email !== decoded.email) {
+                user.email = decoded.email;
+            }
+            if (decoded.name && user.name !== decoded.name) {
+                user.name = decoded.name;
+            }
+            await user.save();
+        }
+
+
+        return user;
+    } catch (error) {
+        console.error('❌ [Sync OAuth User] Error:', error);
+        throw error;
+    }
+};
+
+// Protect routes - verify JWT token (both OAuth and regular)
 export const protect = async (req, res, next) => {
+
     try {
         let token;
 
         if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
             token = req.headers.authorization.split(' ')[1];
+
         }
 
         if (!token) {
+
             return res.status(401).json({ message: 'Not authorized, no token' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = await User.findById(decoded.id).select('-password');
+        let decoded;
+        let isOAuthToken = false;
 
-        if (!req.user) {
-            return res.status(401).json({ message: 'User not found' });
+        // Try verifying as OAuth token first (RS256)
+        try {
+
+            decoded = verifyOAuthToken(token);
+            isOAuthToken = true;
+
+        } catch (oauthError) {
+
+            // If OAuth verification fails, try regular JWT (HS256)
+            try {
+                decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            } catch (regularError) {
+
+                return res.status(401).json({ message: 'Not authorized, token failed' });
+            }
         }
+
+        if (isOAuthToken) {
+            // OAuth token - sync user from token data
+
+            req.user = { _id: decoded.sub };
+            req.dbUser = await syncOAuthUser(decoded);
+            req.user = req.dbUser;
+
+        } else {
+            // Regular token - get user from database
+
+            req.user = await User.findById(decoded.id).select('-password');
+
+            if (!req.user) {
+
+                return res.status(401).json({ message: 'User not found' });
+            }
+
+        }
+
 
         next();
     } catch (error) {
-        console.error('Auth middleware error:', error);
+        console.error('❌ [Auth Middleware] Unexpected error:', error);
         return res.status(401).json({ message: 'Not authorized, token failed' });
     }
 };

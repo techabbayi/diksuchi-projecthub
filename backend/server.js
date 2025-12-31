@@ -36,6 +36,7 @@ import reviewRoutes from './routes/reviewRoutes.js';
 import projectBuilderRoutes from './routes/projectBuilderRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import chatbotRoutes from './routes/chatbotRoutes.js';
+import oauthRoutes from './routes/oauthRoutes.js';
 import groqService from './services/groqService.js';
 
 // Connect to database
@@ -77,13 +78,19 @@ const allowedOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
     : ['http://localhost:5173'];
 
+console.log('📋 Allowed CORS origins:', allowedOrigins);
+
 app.use(
     cors({
         origin: (origin, callback) => {
             // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
-            if (!origin) return callback(null, true);
+            if (!origin) {
 
-            if (allowedOrigins.indexOf(origin) !== -1) {
+                return callback(null, true);
+            }
+
+            if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(allowed => origin.includes(allowed))) {
+
                 callback(null, true);
             } else {
                 console.log('❌ CORS blocked origin:', origin);
@@ -93,11 +100,17 @@ app.use(
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
+        exposedHeaders: ['Content-Type', 'Authorization'],
+        maxAge: 86400, // 24 hours
     })
 );
 
+// Handle preflight requests explicitly
+app.options('*', cors());
+
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/oauth', oauthRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payment', paymentRoutes);

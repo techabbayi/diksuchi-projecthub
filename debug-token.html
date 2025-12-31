@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Debug OAuth Token</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+
+        pre {
+            background: #252526;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+
+        .success {
+            color: #4ec9b0;
+        }
+
+        .error {
+            color: #f48771;
+        }
+
+        .warning {
+            color: #dcdcaa;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔍 OAuth Token Debugger</h1>
+
+    <button onclick="checkToken()">Check Token in localStorage</button>
+    <button onclick="clearAll()">Clear All Storage</button>
+
+    <div id="output"></div>
+
+    <script>
+        function checkToken() {
+            const output = document.getElementById('output');
+            const accessToken = localStorage.getItem('access_token');
+            const regularToken = localStorage.getItem('token');
+            const codeVerifier = sessionStorage.getItem('code_verifier');
+
+            let html = '<h2>Storage Contents:</h2>';
+            html += `<pre>access_token: ${accessToken ? accessToken.substring(0, 50) + '...' : 'NOT FOUND'}</pre>`;
+            html += `<pre>token: ${regularToken ? regularToken.substring(0, 50) + '...' : 'NOT FOUND'}</pre>`;
+            html += `<pre>code_verifier: ${codeVerifier ? codeVerifier.substring(0, 30) + '...' : 'NOT FOUND'}</pre>`;
+
+            if (accessToken) {
+                try {
+                    const parts = accessToken.split('.');
+                    const header = JSON.parse(atob(parts[0]));
+                    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+                    html += '<h2 class="success">✅ Token Decoded Successfully:</h2>';
+                    html += '<h3>Header:</h3>';
+                    html += `<pre>${JSON.stringify(header, null, 2)}</pre>`;
+                    html += '<h3>Payload:</h3>';
+                    html += `<pre>${JSON.stringify(payload, null, 2)}</pre>`;
+
+                    html += '<h2>Key Information:</h2>';
+                    html += `<pre class="warning">Issuer: ${payload.iss}</pre>`;
+                    html += `<pre class="warning">Subject: ${payload.sub}</pre>`;
+                    html += `<pre class="warning">Email: ${payload.email || 'N/A'}</pre>`;
+                    html += `<pre class="warning">Expires: ${new Date(payload.exp * 1000).toLocaleString()}</pre>`;
+
+                    // Check if expired
+                    if (payload.exp * 1000 < Date.now()) {
+                        html += '<pre class="error">⚠️ TOKEN IS EXPIRED!</pre>';
+                    } else {
+                        html += '<pre class="success">✅ Token is still valid</pre>';
+                    }
+
+                } catch (e) {
+                    html += `<pre class="error">❌ Failed to decode token: ${e.message}</pre>`;
+                }
+            } else {
+                html += '<pre class="error">❌ No access_token found in localStorage</pre>';
+            }
+
+            output.innerHTML = html;
+        }
+
+        function clearAll() {
+            localStorage.clear();
+            sessionStorage.clear();
+            document.getElementById('output').innerHTML = '<pre class="success">✅ All storage cleared!</pre>';
+        }
+
+        // Auto-check on load
+        window.onload = checkToken;
+    </script>
+</body>
+
+</html>

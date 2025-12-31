@@ -53,6 +53,7 @@ import ProjectDetails from './pages/ProjectDetails';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
+import Callback from './pages/Callback';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import CreatorUpload from './pages/CreatorUpload';
@@ -69,6 +70,13 @@ import Support from './pages/Support';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
+  const { initAuth } = useAuthStore();
+
+  // Initialize auth state on app mount
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
+
   return (
     <Router
       future={{
@@ -88,6 +96,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/callback" element={<Callback />} />
 
               {/* Legal Pages */}
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />

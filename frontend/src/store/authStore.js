@@ -5,10 +5,18 @@ import toast from 'react-hot-toast';
 
 export const useAuthStore = create(
     persist(
-        (set) => ({
+        (set, get) => ({
             user: null,
             token: null,
             isAuthenticated: false,
+
+            // Initialize auth state from localStorage
+            initAuth: () => {
+                const storedToken = localStorage.getItem('access_token') || localStorage.getItem('token');
+                if (storedToken && !get().token) {
+                    set({ token: storedToken });
+                }
+            },
 
             login: async (credentials) => {
                 try {
@@ -47,8 +55,40 @@ export const useAuthStore = create(
             logout: () => {
                 set({ user: null, token: null, isAuthenticated: false });
                 localStorage.removeItem('token');
+                localStorage.removeItem('access_token');
                 localStorage.removeItem('user');
+                sessionStorage.removeItem('code_verifier');
                 toast.success('Logged out successfully');
+            },
+
+            fetchUser: async () => {
+                try {
+                    // Sync token from localStorage to Zustand state
+                    const storedToken = localStorage.getItem('access_token') || localStorage.getItem('token');
+
+                    if (!storedToken) {
+                        // No token available, clear auth state
+                        set({ user: null, token: null, isAuthenticated: false });
+                        throw new Error('No authentication token found');
+                    }
+
+                    const { data } = await api.get('/auth/me');
+                    set({
+                        user: data.data,
+                        token: storedToken,
+                        isAuthenticated: true
+                    });
+                    return data.data;
+                } catch (error) {
+                    console.error('Fetch user error:', error);
+                    // Clear auth state on error (token expired or invalid)
+                    set({ user: null, token: null, isAuthenticated: false });
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    sessionStorage.removeItem('code_verifier');
+                    throw error;
+                }
             },
 
             updateUser: (userData) => {

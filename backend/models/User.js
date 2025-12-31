@@ -3,6 +3,17 @@ import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema(
     {
+        oauthId: {
+            type: String,
+            unique: true,
+            sparse: true,
+            index: true,
+        },
+        name: {
+            type: String,
+            trim: true,
+            maxlength: [50, 'Name cannot exceed 50 characters'],
+        },
         username: {
             type: String,
             required: [true, 'Username is required'],
@@ -21,7 +32,7 @@ const userSchema = new mongoose.Schema(
         },
         password: {
             type: String,
-            required: [true, 'Password is required'],
+            required: function () { return !this.oauthId; },
             minlength: [6, 'Password must be at least 6 characters'],
             select: false,
         },
@@ -73,7 +84,7 @@ const userSchema = new mongoose.Schema(
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) {
+    if (!this.isModified('password') || !this.password) {
         return next();
     }
     const salt = await bcrypt.genSalt(10);
