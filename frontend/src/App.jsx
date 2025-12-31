@@ -97,6 +97,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/callback" element={<Callback />} />
+              <Route path="/login/callback" element={<Callback />} />
 
               {/* Legal Pages */}
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
