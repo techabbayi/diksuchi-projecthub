@@ -85,12 +85,16 @@ app.use(
         origin: (origin, callback) => {
             // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
             if (!origin) {
-
                 return callback(null, true);
             }
 
-            if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(allowed => origin.includes(allowed))) {
+            // Check if origin matches allowed origins or is a Vercel deployment
+            const isAllowed = allowedOrigins.indexOf(origin) !== -1 ||
+                allowedOrigins.some(allowed => origin.includes(allowed)) ||
+                origin.includes('vercel.app') ||
+                origin.includes('projecthub.diksuchiedtech.in');
 
+            if (isAllowed) {
                 callback(null, true);
             } else {
                 console.log('❌ CORS blocked origin:', origin);
