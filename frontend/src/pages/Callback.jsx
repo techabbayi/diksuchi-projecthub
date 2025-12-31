@@ -6,6 +6,9 @@ import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 
 const Callback = () => {
+    console.log('🚀 [Callback] Component mounted/rendered');
+    console.log('📍 [Callback] Current location:', window.location.href);
+
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [error, setError] = useState(null);
@@ -13,6 +16,15 @@ const Callback = () => {
     const hasProcessed = useRef(false);
 
     useEffect(() => {
+        // Log environment info for debugging
+        console.log('🌍 [Callback] Environment Info:', {
+            href: window.location.href,
+            pathname: window.location.pathname,
+            hostname: window.location.hostname,
+            origin: window.location.origin,
+            baseURI: document.baseURI,
+        });
+
         // Prevent double execution (React Strict Mode issue)
         if (hasProcessed.current) {
             console.log('⏭️ [Callback] Already processed, skipping...');
