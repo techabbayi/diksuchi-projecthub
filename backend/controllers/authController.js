@@ -63,11 +63,21 @@ export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // Validate required fields
+        if (!email || !password) {
+            return errorResponse(res, 400, 'Email and password are required');
+        }
+
         // Find user and include password
         const user = await User.findOne({ email }).select('+password');
 
         if (!user) {
             return errorResponse(res, 401, 'Invalid email or password');
+        }
+
+        // Check if user has a password (OAuth users might not have one)
+        if (!user.password) {
+            return errorResponse(res, 401, 'Please login using your OAuth provider');
         }
 
         // Check password
@@ -202,7 +212,21 @@ export const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
 
+        // Validate required fields
+        if (!currentPassword || !newPassword) {
+            return errorResponse(res, 400, 'Current password and new password are required');
+        }
+
+        if (newPassword.length < 6) {
+            return errorResponse(res, 400, 'New password must be at least 6 characters long');
+        }
+
         const user = await User.findById(req.user._id).select('+password');
+
+        // Check if user has a password (OAuth users might not have one)
+        if (!user.password) {
+            return errorResponse(res, 400, 'Cannot change password for OAuth accounts. Please use your OAuth provider to change password.');
+        }
 
         const isMatch = await user.comparePassword(currentPassword);
 
