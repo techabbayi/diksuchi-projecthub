@@ -29,8 +29,6 @@ const base64URLEncode = (buffer) => {
 // Initiate OAuth login flow
 export const login = async () => {
     try {
-        console.log('🚀 [OAuth] Starting login flow...');
-
         // Validate configuration
         if (!AUTH_SERVER_URL) {
             throw new Error('OAuth server URL not configured. Please set VITE_DIKSUCHI_AUTH_SERVER_URL');
@@ -42,29 +40,16 @@ export const login = async () => {
             throw new Error('Redirect URI not configured. Please set VITE_DIKSUCHI_REDIRECT_URI');
         }
 
-        console.log('📋 [OAuth] Config:', {
-            AUTH_SERVER_URL,
-            CLIENT_ID,
-            REDIRECT_URI,
-            SCOPES
-        });
-
         // Generate PKCE parameters
         const codeVerifier = generateCodeVerifier();
         const codeChallenge = await generateCodeChallenge(codeVerifier);
-        console.log('🔐 [OAuth] PKCE generated:', {
-            verifier: codeVerifier.substring(0, 10) + '...',
-            challenge: codeChallenge.substring(0, 10) + '...'
-        });
 
         // Store code verifier for token exchange
         sessionStorage.setItem('code_verifier', codeVerifier);
-        console.log('💾 [OAuth] Stored code_verifier in sessionStorage');
 
         // Generate and store state for CSRF protection
         const state = generateRandomState();
         sessionStorage.setItem('oauth_state', state);
-        console.log('💾 [OAuth] Stored oauth_state in sessionStorage');
 
         // Build authorization URL (handle trailing slashes)
         const baseUrl = AUTH_SERVER_URL.replace(/\/$/, '');
@@ -77,14 +62,8 @@ export const login = async () => {
         authUrl.searchParams.append('code_challenge_method', 'S256');
         authUrl.searchParams.append('state', state);
 
-        console.log('🔗 [OAuth] Full Authorization URL:', authUrl.toString());
-        console.log('📍 [OAuth] Now redirecting browser to OAuth provider...');
-        console.log('⏳ [OAuth] Please wait for redirect...');
-
-        // Use setTimeout to ensure logs are visible before redirect
-        setTimeout(() => {
-            window.location.href = authUrl.toString();
-        }, 100);
+        // Redirect to OAuth provider
+        window.location.href = authUrl.toString();
     } catch (error) {
         console.error('OAuth login error:', error);
         throw error;
@@ -101,11 +80,7 @@ const generateRandomState = () => {
 // Handle OAuth callback and exchange code for token
 export const handleCallback = async (code) => {
     try {
-        console.log('🚀 [handleCallback] Starting token exchange...');
-        console.log('📋 [handleCallback] Code:', code ? code.substring(0, 20) + '...' : 'MISSING!');
-
         const codeVerifier = sessionStorage.getItem('code_verifier');
-        console.log('🔑 [handleCallback] Code verifier:', codeVerifier ? codeVerifier.substring(0, 20) + '...' : 'MISSING!');
 
         if (!codeVerifier) {
             throw new Error('Code verifier not found. Please try logging in again.');
@@ -114,7 +89,6 @@ export const handleCallback = async (code) => {
         // Call auth server directly (CORS is enabled on auth server)
         const baseUrl = AUTH_SERVER_URL.replace(/\/$/, '');
         const tokenEndpoint = `${baseUrl}/api/oauth/token`;
-        console.log('🔄 [handleCallback] Exchanging code for token at:', tokenEndpoint);
 
         const requestBody = {
             grant_type: 'authorization_code',
@@ -123,7 +97,6 @@ export const handleCallback = async (code) => {
             code_verifier: codeVerifier,
             client_id: CLIENT_ID,
         };
-        console.log('📦 [handleCallback] Request body:', JSON.stringify(requestBody, null, 2));
 
         const response = await fetch(tokenEndpoint, {
             method: 'POST',
@@ -133,52 +106,36 @@ export const handleCallback = async (code) => {
             body: JSON.stringify(requestBody),
         });
 
-        console.log('📡 [handleCallback] Response status:', response.status, response.statusText);
-        console.log('📡 [handleCallback] Response OK:', response.ok);
-
         if (!response.ok) {
             let errorMessage = 'Token exchange failed';
             try {
                 const error = await response.json();
-                console.error('❌ [handleCallback] Server error response:', error);
                 errorMessage = error.error_description || error.error || error.message || errorMessage;
             } catch (e) {
                 // Response wasn't JSON
                 errorMessage = `Server error: ${response.status} ${response.statusText}`;
-                console.error('❌ [handleCallback] Non-JSON error response:', errorMessage);
             }
             throw new Error(errorMessage);
         }
 
         const data = await response.json();
-        console.log('📦 [handleCallback] Response data:', JSON.stringify(data, null, 2));
 
         // Auth server returns token directly (not wrapped in data object)
         const access_token = data.access_token;
-        console.log('🎫 [handleCallback] Access token:', access_token ? access_token.substring(0, 30) + '...' : 'MISSING!');
 
         if (!access_token) {
             throw new Error('No access token received from server');
         }
 
         // Store access token
-        console.log('💾 [handleCallback] Saving token to localStorage...');
         localStorage.setItem('access_token', access_token);
 
-        // Verify it was saved
-        const saved = localStorage.getItem('access_token');
-        console.log('🔍 [handleCallback] Token saved successfully:', saved ? 'YES (' + saved.substring(0, 30) + '...)' : 'NO!');
-
         // Clean up code verifier
-        console.log('🧹 [handleCallback] Removing code_verifier from session...');
         sessionStorage.removeItem('code_verifier');
 
-        console.log('✅ [handleCallback] Token exchange complete!');
         return access_token;
     } catch (error) {
-        console.error('❌ [handleCallback] OAuth callback error:', error);
-        console.error('❌ [handleCallback] Error message:', error.message);
-        console.error('❌ [handleCallback] Error stack:', error.stack);
+        console.error('OAuth callback error:', error);
         sessionStorage.removeItem('code_verifier');
         throw error;
     }

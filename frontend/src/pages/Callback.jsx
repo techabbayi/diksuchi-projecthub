@@ -6,9 +6,6 @@ import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
 
 const Callback = () => {
-    console.log('🚀 [Callback] Component mounted/rendered');
-    console.log('📍 [Callback] Current location:', window.location.href);
-
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [error, setError] = useState(null);
@@ -16,95 +13,58 @@ const Callback = () => {
     const hasProcessed = useRef(false);
 
     useEffect(() => {
-        // Log environment info for debugging
-        console.log('🌍 [Callback] Environment Info:', {
-            href: window.location.href,
-            pathname: window.location.pathname,
-            hostname: window.location.hostname,
-            origin: window.location.origin,
-            baseURI: document.baseURI,
-        });
-
         // Prevent double execution (React Strict Mode issue)
         if (hasProcessed.current) {
-            console.log('⏭️ [Callback] Already processed, skipping...');
             return;
         }
         hasProcessed.current = true;
-        const processCallback = async () => {
-            console.log('\n🎯 [Callback] OAuth callback page loaded');
-            console.log('📋 [Callback] URL params:', {
-                code: searchParams.get('code')?.substring(0, 10) + '...',
-                state: searchParams.get('state'),
-                error: searchParams.get('error'),
-                error_description: searchParams.get('error_description')
-            });
 
+        const processCallback = async () => {
             try {
                 const code = searchParams.get('code');
                 const state = searchParams.get('state');
                 const errorParam = searchParams.get('error');
 
                 if (errorParam) {
-                    console.log('❌ [Callback] OAuth provider returned error:', errorParam);
                     throw new Error(searchParams.get('error_description') || 'OAuth authorization failed');
                 }
 
                 if (!code) {
-                    console.log('❌ [Callback] No authorization code in URL');
                     throw new Error('No authorization code received');
                 }
 
-                // Verify state parameter (CSRF protection)
+                // Verify state parameter for CSRF protection
                 const storedState = sessionStorage.getItem('oauth_state');
-                console.log('🔒 [Callback] Verifying state parameter...');
-                console.log('📋 [Callback] Received state:', state);
-                console.log('📋 [Callback] Stored state:', storedState);
-
-                if (!state || !storedState || state !== storedState) {
-                    console.log('❌ [Callback] State mismatch - possible CSRF attack!');
-                    throw new Error('Invalid state parameter. Please try logging in again.');
+                if (!state || state !== storedState) {
+                    throw new Error('Invalid state parameter - possible security threat');
                 }
-                console.log('✅ [Callback] State verified successfully');
 
-                console.log('✅ [Callback] Authorization code received, exchanging for token...');
-
-                // Clear any old tokens first (but keep code_verifier - we need it!)
-                console.log('🧹 [Callback] Clearing old tokens...');
+                // Clear old tokens first
                 localStorage.removeItem('token');
                 localStorage.removeItem('access_token');
 
                 // Exchange code for token
-                console.log('🔄 [Callback] Calling handleCallback with code...');
-                console.log('📋 [Callback] Code:', code.substring(0, 20) + '...');
-                console.log('📋 [Callback] Code verifier present:', !!sessionStorage.getItem('code_verifier'));
-
                 const token = await handleCallback(code);
-                console.log('✅ [Callback] handleCallback returned token:', token ? token.substring(0, 30) + '...' : 'NULL!');
+
+                if (!token) {
+                    throw new Error('Failed to obtain access token');
+                }
 
                 // Verify token was stored
                 const storedToken = localStorage.getItem('access_token');
-                console.log('🔍 [Callback] Token in localStorage:', storedToken ? storedToken.substring(0, 30) + '...' : 'NOT STORED!');
-
                 if (!storedToken) {
                     throw new Error('Token was not saved to localStorage after exchange');
                 }
 
                 // Clean up OAuth session data
-                console.log('🧹 [Callback] Cleaning up OAuth session data...');
                 sessionStorage.removeItem('oauth_state');
-                // Note: code_verifier is removed in handleCallback after use
-
-                console.log('✅ [Callback] Token exchange successful!');
-                console.log('👤 [Callback] Now fetching user data...');
 
                 // Fetch user data with error handling
                 try {
                     await fetchUser();
                 } catch (fetchError) {
                     console.error('Failed to fetch user after OAuth:', fetchError);
-                    // Don't throw here - we have a valid token, just couldn't fetch user details yet
-                    // The user can still access the app
+                    // Don't throw here - we have a valid token
                     toast.error('Login successful, but failed to load user details. Please refresh.');
                 }
 
@@ -119,7 +79,7 @@ const Callback = () => {
 
                 // Provide more helpful error messages
                 if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-                    errorMessage = 'Cannot connect to server. Please make sure the backend is running at http://localhost:5000';
+                    errorMessage = 'Cannot connect to server. Please check your connection.';
                 }
 
                 setError(errorMessage);

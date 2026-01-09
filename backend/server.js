@@ -86,7 +86,7 @@ const allowedOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
     : ['http://localhost:5173'];
 
-console.log('📋 Allowed CORS origins:', allowedOrigins);
+console.log('📋 Production CORS origins configured');
 
 app.use(
     cors({
@@ -105,7 +105,6 @@ app.use(
             if (isAllowed) {
                 callback(null, true);
             } else {
-                console.log('❌ CORS blocked origin:', origin);
                 callback(new Error('Not allowed by CORS'));
             }
         },

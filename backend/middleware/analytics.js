@@ -35,7 +35,7 @@ const parseUserAgent = (userAgent) => {
             isMobile: deviceType === 'mobile' || deviceType === 'tablet'
         };
     } catch (error) {
-        console.log('User agent parsing error:', error.message);
+        // User agent parsing error - continue without parsed data
         return {
             browser: 'Unknown',
             browserVersion: 'Unknown',
@@ -70,7 +70,7 @@ const getGeoInfo = (ip) => {
             };
         }
     } catch (error) {
-        console.log('GeoIP lookup error:', error.message);
+        // GeoIP lookup error - continue without geo data
     }
 
     return {
