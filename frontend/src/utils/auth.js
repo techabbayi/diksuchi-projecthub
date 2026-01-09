@@ -130,7 +130,6 @@ export const handleCallback = async (code) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            credentials: 'include',
             body: JSON.stringify(requestBody),
         });
 
