@@ -182,7 +182,7 @@ export const trackPageVisit = async (req, res, next) => {
         const isAuthenticated = !!req.user;
 
         // Determine if this is a new or returning visitor
-        const isNewVisitor = !req.cookies['visitor_id'];
+        const isNewVisitor = !req.cookies?.visitor_id;
         const isReturningVisitor = !isNewVisitor;
 
         // Set visitor cookie if new (expires in 2 years)
