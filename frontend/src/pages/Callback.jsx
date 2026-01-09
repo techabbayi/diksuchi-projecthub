@@ -55,14 +55,17 @@ const Callback = () => {
                     position: 'top-center'
                 });
 
-                // Fetch user data in background while redirecting (don't wait)
-                fetchUser().catch(fetchError => {
-                    console.error('Background user fetch failed:', fetchError);
-                    // User can still use the app, just refresh to get user data
-                });
-
-                // Immediate redirect for faster UX (don't wait for user fetch)
-                navigate('/dashboard', { replace: true });
+                // Wait for user data fetch to complete before redirecting
+                // This ensures isAuthenticated is true before ProtectedRoute check
+                try {
+                    await fetchUser();
+                    // Redirect only after auth state is properly set
+                    navigate('/dashboard', { replace: true });
+                } catch (fetchError) {
+                    console.error('User fetch failed:', fetchError);
+                    setError('Login successful but failed to load user data. Please refresh the page.');
+                    toast.error('Failed to load user data. Please try refreshing.');
+                }
 
             } catch (err) {
                 console.error('OAuth callback error:', err);
@@ -133,7 +136,7 @@ const Callback = () => {
                         Completing Login
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400">
-                        Please wait while we verify your account...
+                        Setting up your session and redirecting to dashboard...
                     </p>
                 </div>
             </div>

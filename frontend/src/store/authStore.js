@@ -11,10 +11,17 @@ export const useAuthStore = create(
             isAuthenticated: false,
 
             // Initialize auth state from localStorage
-            initAuth: () => {
+            initAuth: async () => {
                 const storedToken = localStorage.getItem('access_token') || localStorage.getItem('token');
                 if (storedToken && !get().token) {
                     set({ token: storedToken });
+                    // Try to fetch user data to restore full auth state
+                    try {
+                        await get().fetchUser();
+                    } catch (error) {
+                        // If token is invalid, clear it
+                        console.warn('Token validation failed during init, clearing auth state');
+                    }
                 }
             },
 
