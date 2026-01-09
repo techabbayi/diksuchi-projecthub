@@ -123,6 +123,16 @@ const projectSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        uniqueViews: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        uniqueDownloads: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         rating: {
             type: Number,
             default: 0,
@@ -144,6 +154,83 @@ const projectSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        // Enhanced analytics
+        analytics: {
+            totalViews: {
+                type: Number,
+                default: 0,
+            },
+            uniqueViews: {
+                type: Number,
+                default: 0,
+            },
+            totalDownloads: {
+                type: Number,
+                default: 0,
+            },
+            uniqueDownloads: {
+                type: Number,
+                default: 0,
+            },
+            viewsToday: {
+                type: Number,
+                default: 0,
+            },
+            downloadsToday: {
+                type: Number,
+                default: 0,
+            },
+            viewsThisWeek: {
+                type: Number,
+                default: 0,
+            },
+            downloadsThisWeek: {
+                type: Number,
+                default: 0,
+            },
+            viewsThisMonth: {
+                type: Number,
+                default: 0,
+            },
+            downloadsThisMonth: {
+                type: Number,
+                default: 0,
+            },
+            lastViewedAt: {
+                type: Date,
+            },
+            lastDownloadedAt: {
+                type: Date,
+            },
+            topCountries: [{
+                country: String,
+                count: Number,
+            }],
+            topDevices: [{
+                device: String,
+                count: Number,
+            }],
+            topSources: [{
+                source: String,
+                count: Number,
+            }],
+            conversionRate: {
+                type: Number,
+                default: 0, // views to downloads ratio
+                min: 0,
+                max: 100,
+            },
+            avgSessionDuration: {
+                type: Number,
+                default: 0, // in milliseconds
+            },
+            bounceRate: {
+                type: Number,
+                default: 0,
+                min: 0,
+                max: 100,
+            },
+        },
     },
     {
         timestamps: true,
@@ -154,6 +241,132 @@ const projectSchema = new mongoose.Schema(
 projectSchema.index({ title: 'text', description: 'text', tags: 'text' });
 projectSchema.index({ status: 1, type: 1 });
 projectSchema.index({ author: 1 });
+projectSchema.index({ 'analytics.totalViews': -1 });
+projectSchema.index({ 'analytics.totalDownloads': -1 });
+projectSchema.index({ 'analytics.lastViewedAt': -1 });
+projectSchema.index({ 'analytics.lastDownloadedAt': -1 });
+
+// Instance methods for analytics
+projectSchema.methods.incrementViews = function (isUnique = false) {
+    this.views = (this.views || 0) + 1;
+    this.analytics.totalViews = (this.analytics.totalViews || 0) + 1;
+    this.analytics.viewsToday = (this.analytics.viewsToday || 0) + 1;
+    this.analytics.viewsThisWeek = (this.analytics.viewsThisWeek || 0) + 1;
+    this.analytics.viewsThisMonth = (this.analytics.viewsThisMonth || 0) + 1;
+    this.analytics.lastViewedAt = new Date();
+
+    if (isUnique) {
+        this.uniqueViews = (this.uniqueViews || 0) + 1;
+        this.analytics.uniqueViews = (this.analytics.uniqueViews || 0) + 1;
+    }
+
+    return this.save();
+};
+
+projectSchema.methods.incrementDownloads = function (isUnique = false) {
+    this.downloads = (this.downloads || 0) + 1;
+    this.analytics.totalDownloads = (this.analytics.totalDownloads || 0) + 1;
+    this.analytics.downloadsToday = (this.analytics.downloadsToday || 0) + 1;
+    this.analytics.downloadsThisWeek = (this.analytics.downloadsThisWeek || 0) + 1;
+    this.analytics.downloadsThisMonth = (this.analytics.downloadsThisMonth || 0) + 1;
+    this.analytics.lastDownloadedAt = new Date();
+
+    if (isUnique) {
+        this.uniqueDownloads = (this.uniqueDownloads || 0) + 1;
+        this.analytics.uniqueDownloads = (this.analytics.uniqueDownloads || 0) + 1;
+    }
+
+    // Update conversion rate
+    this.updateConversionRate();
+
+    return this.save();
+};
+
+projectSchema.methods.updateConversionRate = function () {
+    const totalViews = this.analytics.totalViews || this.views || 0;
+    const totalDownloads = this.analytics.totalDownloads || this.downloads || 0;
+
+    if (totalViews > 0) {
+        this.analytics.conversionRate = Math.round((totalDownloads / totalViews) * 100 * 100) / 100;
+    } else {
+        this.analytics.conversionRate = 0;
+    }
+};
+
+projectSchema.methods.updateAnalyticsFromData = function (analyticsData) {
+    if (!analyticsData) return;
+
+    // Update top countries
+    if (analyticsData.topCountries) {
+        this.analytics.topCountries = analyticsData.topCountries.slice(0, 5);
+    }
+
+    // Update top devices
+    if (analyticsData.topDevices) {
+        this.analytics.topDevices = analyticsData.topDevices.slice(0, 5);
+    }
+
+    // Update top sources
+    if (analyticsData.topSources) {
+        this.analytics.topSources = analyticsData.topSources.slice(0, 5);
+    }
+
+    // Update session metrics
+    if (analyticsData.avgSessionDuration !== undefined) {
+        this.analytics.avgSessionDuration = analyticsData.avgSessionDuration;
+    }
+
+    if (analyticsData.bounceRate !== undefined) {
+        this.analytics.bounceRate = analyticsData.bounceRate;
+    }
+
+    return this.save();
+};
+
+// Static method to reset daily/weekly/monthly counters
+projectSchema.statics.resetPeriodCounters = function (period) {
+    const updateObj = {};
+
+    switch (period) {
+        case 'daily':
+            updateObj['analytics.viewsToday'] = 0;
+            updateObj['analytics.downloadsToday'] = 0;
+            break;
+        case 'weekly':
+            updateObj['analytics.viewsThisWeek'] = 0;
+            updateObj['analytics.downloadsThisWeek'] = 0;
+            break;
+        case 'monthly':
+            updateObj['analytics.viewsThisMonth'] = 0;
+            updateObj['analytics.downloadsThisMonth'] = 0;
+            break;
+    }
+
+    return this.updateMany({}, { $set: updateObj });
+};
+
+// Static method to get trending projects
+projectSchema.statics.getTrending = function (timeframe = 'week', limit = 10) {
+    let sortField;
+    switch (timeframe) {
+        case 'today':
+            sortField = 'analytics.viewsToday';
+            break;
+        case 'week':
+            sortField = 'analytics.viewsThisWeek';
+            break;
+        case 'month':
+            sortField = 'analytics.viewsThisMonth';
+            break;
+        default:
+            sortField = 'analytics.totalViews';
+    }
+
+    return this.find({ status: 'approved' })
+        .sort({ [sortField]: -1 })
+        .limit(limit)
+        .populate('author', 'username avatar');
+};
 
 const Project = mongoose.model('Project', projectSchema);
 

@@ -26,6 +26,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/database.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { trackPageVisit } from './middleware/analytics.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -111,6 +112,9 @@ app.use(
 
 // Handle preflight requests explicitly
 app.options('*', cors());
+
+// Analytics middleware (before routes)
+app.use(trackPageVisit);
 
 // Routes
 app.use('/api/auth', authRoutes);

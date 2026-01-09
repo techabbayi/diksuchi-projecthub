@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Review from '../models/Review.js';
 import cloudinary from '../config/cloudinary.js';
 import { successResponse, errorResponse, getPagination } from '../utils/helpers.js';
+import { trackProjectView, trackProjectDownload } from '../middleware/analytics.js';
 
 // @desc    Get all projects (with filters)
 // @route   GET /api/projects
@@ -80,6 +81,9 @@ export const getProject = async (req, res) => {
         // Increment views
         project.views += 1;
         await project.save();
+
+        // Track analytics
+        await trackProjectView(project._id.toString(), req);
 
         // Get reviews
         const reviews = await Review.find({ project: project._id })
@@ -278,6 +282,64 @@ export const getMyProjects = async (req, res) => {
         successResponse(res, 200, 'Projects fetched successfully', projects);
     } catch (error) {
         console.error('Get my projects error:', error);
+        errorResponse(res, 500, error.message);
+    }
+};
+
+// @desc    Download project
+// @route   GET /api/projects/:id/download
+// @access  Public
+export const downloadProject = async (req, res) => {
+    try {
+        const project = await Project.findById(req.params.id);
+
+        if (!project) {
+            return errorResponse(res, 404, 'Project not found');
+        }
+
+        if (project.status !== 'approved') {
+            return errorResponse(res, 403, 'Project not approved for download');
+        }
+
+        // Increment downloads
+        project.downloads += 1;
+        await project.save();
+
+        // Track download analytics
+        const downloadData = {
+            type: project.mode === 'zip' ? 'zip' : 'github',
+            fileName: project.zipUrl ? project.zipUrl.split('/').pop() : `${project.title}.zip`,
+            success: true
+        };
+
+        await trackProjectDownload(project._id.toString(), downloadData, req);
+
+        // Return download URL or redirect
+        if (project.mode === 'zip' && project.zipUrl) {
+            successResponse(res, 200, 'Download URL retrieved', {
+                downloadUrl: project.zipUrl,
+                type: 'zip',
+                fileName: project.zipUrl.split('/').pop()
+            });
+        } else if (project.mode === 'github' && project.githubLink) {
+            successResponse(res, 200, 'GitHub repository link', {
+                downloadUrl: project.githubLink,
+                type: 'github',
+                repository: project.githubLink
+            });
+        } else {
+            return errorResponse(res, 400, 'No download available for this project');
+        }
+    } catch (error) {
+        console.error('Download project error:', error);
+
+        // Track failed download
+        try {
+            await trackProjectDownload(req.params.id, { success: false }, req);
+        } catch (trackError) {
+            console.error('Failed to track failed download:', trackError);
+        }
+
         errorResponse(res, 500, error.message);
     }
 };

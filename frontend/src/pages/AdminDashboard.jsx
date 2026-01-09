@@ -97,7 +97,7 @@ const AdminDashboard = () => {
                 fetchAllProjects();
             }
 
-            if (activeTab === 'analytics') {
+            if (activeTab === 'usage-analytics') {
                 fetchAnalytics();
             }
         } catch (error) {
@@ -391,7 +391,7 @@ const AdminDashboard = () => {
                 {/* Tabs */}
                 <div className="border-b">
                     <div className="flex space-x-4 overflow-x-auto">
-                        {['overview', 'projects', 'pending', 'quota-requests', 'custom-projects', 'ai-credits', 'analytics', 'users'].map((tab) => (
+                        {['overview', 'projects', 'pending', 'quota-requests', 'custom-projects', 'ai-credits', 'usage-analytics', 'users'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -465,6 +465,49 @@ const AdminDashboard = () => {
                                         {formatCurrency(stats?.revenue?.adminCommission || 0)}
                                     </div>
                                     <p className="text-xs text-muted-foreground">Platform earnings</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                            <Card
+                                className="cursor-pointer hover:shadow-lg transition-shadow bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-900 border-blue-200 dark:border-blue-800"
+                                onClick={() => navigate('/admin/analytics')}
+                            >
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                                        View Analytics
+                                    </CardTitle>
+                                    <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                                        Comprehensive Analytics
+                                    </div>
+                                    <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mt-1">
+                                        Views, Downloads & Revenue →
+                                    </p>
+                                    <div className="flex items-center justify-between mt-3 text-xs text-blue-600 dark:text-blue-400">
+                                        <span>📊 Charts & Insights</span>
+                                        <span>🔄 Real-time Data</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card
+                                className="cursor-pointer hover:shadow-lg transition-shadow"
+                                onClick={() => setActiveTab('pending')}
+                            >
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
+                                    <Clock className="h-4 w-4 text-orange-500" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-lg font-semibold">{pendingProjects.length} Pending</div>
+                                    <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                                        Review projects →
+                                    </p>
                                 </CardContent>
                             </Card>
                         </div>
@@ -1165,8 +1208,8 @@ const AdminDashboard = () => {
                     </motion.div>
                 )}
 
-                {/* Analytics Tab */}
-                {activeTab === 'analytics' && analyticsData && (
+                {/* Usage Analytics Tab */}
+                {activeTab === 'usage-analytics' && analyticsData && (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}

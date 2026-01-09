@@ -59,6 +59,7 @@ import Profile from './pages/Profile';
 import CreatorUpload from './pages/CreatorUpload';
 import CreatorDashboard from './pages/CreatorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import AnalyticsPage from './pages/AnalyticsPage';
 import BulkUpload from './pages/BulkUpload';
 import ProjectBuilder from './pages/ProjectBuilder';
 import ProjectBuilderDashboard from './pages/ProjectBuilderDashboard';
@@ -151,6 +152,14 @@ function App() {
                 element={
                   <ProtectedRoute roles={['admin']}>
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <ProtectedRoute roles={['admin']}>
+                    <AnalyticsPage />
                   </ProtectedRoute>
                 }
               />

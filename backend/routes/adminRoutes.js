@@ -29,6 +29,8 @@ import {
     updateProject,
     deleteProject,
     getAnalytics,
+    getProjectAnalytics,
+    getBrowseProjectsAnalytics,
 } from '../controllers/adminController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -60,6 +62,8 @@ router.get('/stats', getPlatformStats);
 
 // Analytics
 router.get('/analytics', getAnalytics);
+router.get('/analytics/projects', getProjectAnalytics);
+router.get('/analytics/browse-projects', getBrowseProjectsAnalytics);
 
 // Custom Project Builder management
 router.get('/custom-projects', getAllCustomProjects);

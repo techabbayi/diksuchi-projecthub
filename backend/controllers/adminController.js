@@ -7,6 +7,8 @@ import SuggestedProject from '../models/SuggestedProject.js';
 import ProjectQuota from '../models/ProjectQuota.js';
 import AICredit from '../models/AICredit.js';
 import ChatHistory from '../models/ChatHistory.js';
+import Analytics from '../models/Analytics.js';
+import PageVisit from '../models/PageVisit.js';
 import { successResponse, errorResponse } from '../utils/helpers.js';
 import csvParser from 'csv-parser';
 import mongoose from 'mongoose';
@@ -1028,11 +1030,288 @@ export const deleteProject = async (req, res) => {
     }
 };
 
-// @desc    Get analytics data (AI usage, DB stats, Cloudinary stats)
+// @desc    Get comprehensive analytics data
 // @route   GET /api/admin/analytics
 // @access  Private (Admin)
 export const getAnalytics = async (req, res) => {
     try {
+        const { startDate, endDate, timeframe = '30d' } = req.query;
+
+        // Calculate date range
+        const endDateTime = endDate ? new Date(endDate) : new Date();
+        let startDateTime;
+
+        if (startDate) {
+            startDateTime = new Date(startDate);
+        } else {
+            startDateTime = new Date();
+            switch (timeframe) {
+                case '7d':
+                    startDateTime.setDate(startDateTime.getDate() - 7);
+                    break;
+                case '30d':
+                    startDateTime.setDate(startDateTime.getDate() - 30);
+                    break;
+                case '90d':
+                    startDateTime.setDate(startDateTime.getDate() - 90);
+                    break;
+                case '1y':
+                    startDateTime.setFullYear(startDateTime.getFullYear() - 1);
+                    break;
+                default:
+                    startDateTime.setDate(startDateTime.getDate() - 30);
+            }
+        }
+
+        // Check data counts first
+        const pageVisitCount = await PageVisit.countDocuments();
+        const analyticsCount = await Analytics.countDocuments();
+        const projectCount = await Project.countDocuments();
+
+        // Website Analytics
+        const totalPageViews = await PageVisit.countDocuments({
+            startTime: { $gte: startDateTime, $lte: endDateTime }
+        });
+
+        const uniqueVisitors = await PageVisit.distinct('ipAddress', {
+            startTime: { $gte: startDateTime, $lte: endDateTime }
+        }).then(ips => ips.length);
+
+        const uniqueSessions = await PageVisit.distinct('sessionId', {
+            startTime: { $gte: startDateTime, $lte: endDateTime }
+        }).then(sessions => sessions.length);
+
+        // Page views by day
+        const dailyPageViews = await PageVisit.aggregate([
+            {
+                $match: {
+                    startTime: { $gte: startDateTime, $lte: endDateTime }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: { format: '%Y-%m-%d', date: '$startTime' }
+                    },
+                    views: { $sum: 1 },
+                    uniqueIPs: { $addToSet: '$ipAddress' },
+                    uniqueSessions: { $addToSet: '$sessionId' }
+                }
+            },
+            {
+                $project: {
+                    date: '$_id',
+                    views: 1,
+                    uniqueVisitors: { $size: '$uniqueIPs' },
+                    sessions: { $size: '$uniqueSessions' }
+                }
+            },
+            { $sort: { date: 1 } }
+        ]);
+
+        // Top pages
+        const topPages = await PageVisit.getTopPages(startDateTime, endDateTime, 10);
+
+        // Traffic sources
+        const trafficSources = await PageVisit.getTrafficSources(startDateTime, endDateTime);
+
+        // Device breakdown
+        const deviceStats = await PageVisit.aggregate([
+            {
+                $match: {
+                    startTime: { $gte: startDateTime, $lte: endDateTime }
+                }
+            },
+            {
+                $group: {
+                    _id: '$device',
+                    visits: { $sum: 1 },
+                    uniqueUsers: { $addToSet: '$ipAddress' }
+                }
+            },
+            {
+                $project: {
+                    device: '$_id',
+                    visits: 1,
+                    uniqueUsers: { $size: '$uniqueUsers' }
+                }
+            },
+            { $sort: { visits: -1 } }
+        ]);
+
+        // Country breakdown
+        const countryStats = await PageVisit.aggregate([
+            {
+                $match: {
+                    startTime: { $gte: startDateTime, $lte: endDateTime }
+                }
+            },
+            {
+                $group: {
+                    _id: '$country',
+                    visits: { $sum: 1 },
+                    uniqueUsers: { $addToSet: '$ipAddress' }
+                }
+            },
+            {
+                $project: {
+                    country: '$_id',
+                    visits: 1,
+                    uniqueUsers: { $size: '$uniqueUsers' }
+                }
+            },
+            { $sort: { visits: -1 } },
+            { $limit: 10 }
+        ]);
+
+        // Project Analytics
+        const totalProjectViews = await Analytics.countDocuments({
+            type: 'view',
+            resourceType: 'Project',
+            createdAt: { $gte: startDateTime, $lte: endDateTime }
+        });
+
+        const totalProjectDownloads = await Analytics.countDocuments({
+            type: 'download',
+            resourceType: 'Project',
+            createdAt: { $gte: startDateTime, $lte: endDateTime }
+        });
+
+        const uniqueProjectViewers = await Analytics.distinct('ipAddress', {
+            type: 'view',
+            resourceType: 'Project',
+            createdAt: { $gte: startDateTime, $lte: endDateTime }
+        }).then(ips => ips.length);
+
+        const uniqueProjectDownloaders = await Analytics.distinct('ipAddress', {
+            type: 'download',
+            resourceType: 'Project',
+            createdAt: { $gte: startDateTime, $lte: endDateTime }
+        }).then(ips => ips.length);
+
+        // Top projects by views
+        const topProjectsByViews = await Analytics.aggregate([
+            {
+                $match: {
+                    type: 'view',
+                    resourceType: 'Project',
+                    createdAt: { $gte: startDateTime, $lte: endDateTime }
+                }
+            },
+            {
+                $group: {
+                    _id: '$resourceId',
+                    views: { $sum: 1 },
+                    uniqueViewers: { $addToSet: '$ipAddress' }
+                }
+            },
+            {
+                $project: {
+                    projectId: '$_id',
+                    views: 1,
+                    uniqueViewers: { $size: '$uniqueViewers' }
+                }
+            },
+            { $sort: { views: -1 } },
+            { $limit: 10 },
+            {
+                $lookup: {
+                    from: 'projects',
+                    localField: 'projectId',
+                    foreignField: '_id',
+                    as: 'project'
+                }
+            },
+            { $unwind: '$project' },
+            {
+                $project: {
+                    title: '$project.title',
+                    views: 1,
+                    uniqueViewers: 1,
+                    type: '$project.type',
+                    price: '$project.price'
+                }
+            }
+        ]);
+
+        // Top projects by downloads
+        const topProjectsByDownloads = await Analytics.aggregate([
+            {
+                $match: {
+                    type: 'download',
+                    resourceType: 'Project',
+                    createdAt: { $gte: startDateTime, $lte: endDateTime }
+                }
+            },
+            {
+                $group: {
+                    _id: '$resourceId',
+                    downloads: { $sum: 1 },
+                    uniqueDownloaders: { $addToSet: '$ipAddress' }
+                }
+            },
+            {
+                $project: {
+                    projectId: '$_id',
+                    downloads: 1,
+                    uniqueDownloaders: { $size: '$uniqueDownloaders' }
+                }
+            },
+            { $sort: { downloads: -1 } },
+            { $limit: 10 },
+            {
+                $lookup: {
+                    from: 'projects',
+                    localField: 'projectId',
+                    foreignField: '_id',
+                    as: 'project'
+                }
+            },
+            { $unwind: '$project' },
+            {
+                $project: {
+                    title: '$project.title',
+                    downloads: 1,
+                    uniqueDownloaders: 1,
+                    type: '$project.type',
+                    price: '$project.price'
+                }
+            }
+        ]);
+
+        // Daily project interactions
+        const dailyProjectInteractions = await Analytics.aggregate([
+            {
+                $match: {
+                    resourceType: 'Project',
+                    createdAt: { $gte: startDateTime, $lte: endDateTime }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        date: {
+                            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+                        },
+                        type: '$type'
+                    },
+                    count: { $sum: 1 }
+                }
+            },
+            {
+                $group: {
+                    _id: '$_id.date',
+                    interactions: {
+                        $push: {
+                            type: '$_id.type',
+                            count: '$count'
+                        }
+                    }
+                }
+            },
+            { $sort: { '_id': 1 } }
+        ]);
+
         // AI Usage Stats
         const totalAIChatSessions = await ChatHistory.countDocuments();
         const totalAIMessages = await ChatHistory.aggregate([
@@ -1073,7 +1352,6 @@ export const getAnalytics = async (req, res) => {
         const collectionStats = await Promise.all(
             collections.map(async (col) => {
                 try {
-                    // Use command instead of stats() method
                     const stats = await db.command({ collStats: col.name });
                     return {
                         name: col.name,
@@ -1082,7 +1360,6 @@ export const getAnalytics = async (req, res) => {
                         avgObjSize: stats.avgObjSize || 0
                     };
                 } catch (error) {
-                    // If collection stats fail, return basic info
                     return {
                         name: col.name,
                         count: 0,
@@ -1102,61 +1379,335 @@ export const getAnalytics = async (req, res) => {
             { $group: { _id: '$type', count: { $sum: 1 } } }
         ]);
 
-        // Cloudinary Stats (approximate from projects)
-        const projectsWithImages = await Project.countDocuments({
-            $or: [
-                { thumbnail: { $exists: true, $ne: '' } },
-                { 'images.0': { $exists: true } }
-            ]
-        });
-
-        const imageCount = await Project.aggregate([
-            { $project: { imageCount: { $size: { $ifNull: ['$images', []] } } } },
-            { $group: { _id: null, total: { $sum: '$imageCount' } } }
-        ]);
-
-        res.json({
-            success: true,
-            data: {
-                aiUsage: {
-                    totalChatSessions: totalAIChatSessions,
-                    totalMessages: totalAIMessages[0]?.total || 0,
-                    messagesByMode: messagesByMode.reduce((acc, item) => {
-                        acc[item._id] = item.count;
-                        return acc;
-                    }, {}),
-                    creditsUsage: aiCreditsUsage[0] || {
-                        totalCreditsUsed: 0,
-                        totalActiveUsers: 0,
-                        premiumUsers: 0,
-                        avgCreditsPerUser: 0
-                    },
-                    customProjects: {
-                        total: customProjectsCount,
-                        byStatus: customProjectsByStatus
-                    }
-                },
-                database: {
-                    totalSize: dbStats.dataSize,
-                    storageSize: dbStats.storageSize,
-                    indexSize: dbStats.indexSize,
-                    collections: collectionStats,
-                    totalCollections: collections.length
-                },
-                projects: {
-                    total: totalProjects,
-                    byStatus: projectsByStatus,
-                    byType: projectsByType
-                },
-                cloudinary: {
-                    estimatedProjects: projectsWithImages,
-                    estimatedImages: imageCount[0]?.total || 0,
-                    note: 'Actual Cloudinary stats require API integration'
+        // Revenue Analytics
+        const revenueData = await Transaction.aggregate([
+            {
+                $match: {
+                    status: 'completed',
+                    createdAt: { $gte: startDateTime, $lte: endDateTime }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: { $sum: '$amount' },
+                    adminCommission: { $sum: '$adminCommission' },
+                    creatorEarnings: { $sum: '$creatorEarning' },
+                    totalTransactions: { $sum: 1 }
                 }
             }
-        });
+        ]);
+
+        const revenue = revenueData[0] || {
+            totalRevenue: 0,
+            adminCommission: 0,
+            creatorEarnings: 0,
+            totalTransactions: 0
+        };
+
+        // Create response object
+        const responseData = {
+            overview: {
+                dateRange: {
+                    start: startDateTime,
+                    end: endDateTime,
+                    timeframe
+                },
+                website: {
+                    totalPageViews,
+                    uniqueVisitors,
+                    uniqueSessions,
+                    avgPagesPerSession: uniqueSessions > 0 ? Math.round((totalPageViews / uniqueSessions) * 100) / 100 : 0
+                },
+                projects: {
+                    totalViews: totalProjectViews,
+                    totalDownloads: totalProjectDownloads,
+                    uniqueViewers: uniqueProjectViewers,
+                    uniqueDownloaders: uniqueProjectDownloaders,
+                    conversionRate: totalProjectViews > 0 ? Math.round((totalProjectDownloads / totalProjectViews) * 100 * 100) / 100 : 0
+                },
+                revenue
+            },
+            websiteAnalytics: {
+                dailyPageViews,
+                topPages,
+                trafficSources,
+                deviceStats,
+                countryStats
+            },
+            projectAnalytics: {
+                topProjectsByViews,
+                topProjectsByDownloads,
+                dailyProjectInteractions
+            },
+            aiUsage: {
+                totalChatSessions: totalAIChatSessions,
+                totalMessages: totalAIMessages[0]?.total || 0,
+                messagesByMode: messagesByMode.reduce((acc, item) => {
+                    acc[item._id] = item.count;
+                    return acc;
+                }, {}),
+                creditsUsage: aiCreditsUsage[0] || {
+                    totalCreditsUsed: 0,
+                    totalActiveUsers: 0,
+                    premiumUsers: 0,
+                    avgCreditsPerUser: 0
+                },
+                customProjects: {
+                    total: customProjectsCount,
+                    byStatus: customProjectsByStatus
+                }
+            },
+            database: {
+                totalSize: dbStats.dataSize,
+                storageSize: dbStats.storageSize,
+                indexSize: dbStats.indexSize,
+                collections: collectionStats,
+                totalCollections: collections.length
+            },
+            projects: {
+                total: totalProjects,
+                byStatus: projectsByStatus,
+                byType: projectsByType
+            },
+            cloudinary: {
+                estimatedProjects: totalProjects,
+                estimatedImages: totalProjects * 3, // Estimate 3 images per project
+                note: "Cloudinary usage is estimated based on project count. Actual usage may vary depending on image uploads per project."
+            }
+        };
+
+        successResponse(res, 200, 'Comprehensive analytics data fetched', responseData);
     } catch (error) {
         console.error('Get analytics error:', error);
         errorResponse(res, 500, error.message);
+    }
+};
+
+// @desc    Get detailed project analytics
+// @route   GET /api/admin/analytics/projects
+// @access  Private (Admin)
+export const getProjectAnalytics = async (req, res) => {
+    try {
+        const { projectId, startDate, endDate } = req.query;
+
+        if (!projectId) {
+            return errorResponse(res, 400, 'projectId is required');
+        }
+
+        const project = await Project.findById(projectId).populate('author', 'username email');
+
+        if (!project) {
+            return errorResponse(res, 404, 'Project not found');
+        }
+
+        // Get view analytics
+        const viewAnalytics = await Analytics.getProjectViews(projectId, startDate, endDate);
+
+        // Get download analytics
+        const downloadAnalytics = await Analytics.getProjectDownloads(projectId, startDate, endDate);
+
+        // Device breakdown
+        const deviceBreakdown = await Analytics.aggregate([
+            {
+                $match: {
+                    resourceId: new mongoose.Types.ObjectId(projectId),
+                    type: { $in: ['view', 'download'] }
+                }
+            },
+            {
+                $group: {
+                    _id: '$device',
+                    views: {
+                        $sum: { $cond: [{ $eq: ['$type', 'view'] }, 1, 0] }
+                    },
+                    downloads: {
+                        $sum: { $cond: [{ $eq: ['$type', 'download'] }, 1, 0] }
+                    }
+                }
+            },
+            { $sort: { views: -1 } }
+        ]);
+
+        // Geographic breakdown
+        const geoBreakdown = await Analytics.aggregate([
+            {
+                $match: {
+                    resourceId: new mongoose.Types.ObjectId(projectId),
+                    type: { $in: ['view', 'download'] }
+                }
+            },
+            {
+                $group: {
+                    _id: { country: '$country', city: '$city' },
+                    views: {
+                        $sum: { $cond: [{ $eq: ['$type', 'view'] }, 1, 0] }
+                    },
+                    downloads: {
+                        $sum: { $cond: [{ $eq: ['$type', 'download'] }, 1, 0] }
+                    }
+                }
+            },
+            { $sort: { views: -1 } },
+            { $limit: 20 }
+        ]);
+
+        successResponse(res, 200, 'Project analytics fetched', {
+            project: {
+                id: project._id,
+                title: project.title,
+                author: project.author,
+                type: project.type,
+                price: project.price,
+                status: project.status,
+                createdAt: project.createdAt,
+                analytics: project.analytics
+            },
+            viewAnalytics,
+            downloadAnalytics,
+            breakdown: {
+                byDevice: deviceBreakdown,
+                byGeo: geoBreakdown
+            }
+        });
+    } catch (error) {
+        console.error('Get project analytics error:', error);
+        errorResponse(res, 500, error.message);
+    }
+};
+
+// @desc    Get browse projects page analytics
+// @route   GET /api/admin/analytics/browse-projects
+// @access  Private (Admin)
+export const getBrowseProjectsAnalytics = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const browseProjectsPage = '/projects';
+
+        // Check if PageVisit collection exists and has data
+        const pageVisitCount = await PageVisit.countDocuments({ page: browseProjectsPage });
+
+        if (pageVisitCount === 0) {
+            // Return empty analytics if no data exists
+            return successResponse(res, 200, 'Browse projects page analytics fetched (no data)', {
+                page: browseProjectsPage,
+                summary: {
+                    totalVisits: 0,
+                    uniqueUserCount: 0,
+                    uniqueIPCount: 0,
+                    avgDuration: 0,
+                    avgScrollDepth: 0,
+                    bounceRate: 0,
+                    newVisitors: 0,
+                    returningVisitors: 0,
+                    avgPageLoadTime: 0
+                },
+                dailyAnalytics: [],
+                breakdown: {
+                    byDevice: [],
+                    byGeo: []
+                }
+            });
+        }
+
+        // Page specific analytics
+        const pageAnalytics = await PageVisit.getPageAnalytics(browseProjectsPage, startDate, endDate);
+
+        // Total stats
+        const totalStats = await PageVisit.aggregate([
+            {
+                $match: {
+                    page: browseProjectsPage
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalVisits: { $sum: 1 },
+                    uniqueUsers: { $addToSet: '$userId' },
+                    uniqueIPs: { $addToSet: '$ipAddress' },
+                    avgDuration: { $avg: '$duration' },
+                    avgScrollDepth: { $avg: '$scrollDepth' },
+                    totalBounces: { $sum: { $cond: ['$bounced', 1, 0] } },
+                    newVisitors: { $sum: { $cond: ['$isNewVisitor', 1, 0] } },
+                    returningVisitors: { $sum: { $cond: ['$isReturningVisitor', 1, 0] } },
+                    avgPageLoadTime: { $avg: '$pageLoadTime' }
+                }
+            },
+            {
+                $addFields: {
+                    uniqueUserCount: { $size: '$uniqueUsers' },
+                    uniqueIPCount: { $size: '$uniqueIPs' },
+                    bounceRate: {
+                        $cond: [
+                            { $eq: ['$totalVisits', 0] },
+                            0,
+                            { $multiply: [{ $divide: ['$totalBounces', '$totalVisits'] }, 100] }
+                        ]
+                    }
+                }
+            }
+        ]);
+
+        // Device breakdown
+        const deviceBreakdown = await PageVisit.aggregate([
+            { $match: { page: browseProjectsPage } },
+            {
+                $group: {
+                    _id: '$device',
+                    visits: { $sum: 1 },
+                    totalBounces: { $sum: { $cond: ['$bounced', 1, 0] } }
+                }
+            },
+            {
+                $addFields: {
+                    bounceRate: {
+                        $cond: [
+                            { $eq: ['$visits', 0] },
+                            0,
+                            { $multiply: [{ $divide: ['$totalBounces', '$visits'] }, 100] }
+                        ]
+                    }
+                }
+            },
+            { $sort: { visits: -1 } }
+        ]);
+
+        // Geographic breakdown
+        const geoBreakdown = await PageVisit.aggregate([
+            { $match: { page: browseProjectsPage } },
+            {
+                $group: {
+                    _id: '$country',
+                    visits: { $sum: 1 }
+                }
+            },
+            { $sort: { visits: -1 } },
+            { $limit: 15 }
+        ]);
+
+        successResponse(res, 200, 'Browse projects page analytics fetched', {
+            page: browseProjectsPage,
+            summary: totalStats[0] || {
+                totalVisits: 0,
+                uniqueUserCount: 0,
+                uniqueIPCount: 0,
+                avgDuration: 0,
+                avgScrollDepth: 0,
+                bounceRate: 0,
+                newVisitors: 0,
+                returningVisitors: 0,
+                avgPageLoadTime: 0
+            },
+            dailyAnalytics: pageAnalytics || [],
+            breakdown: {
+                byDevice: deviceBreakdown || [],
+                byGeo: geoBreakdown || []
+            }
+        });
+    } catch (error) {
+        console.error('Get browse projects analytics error:', error);
+        console.error('Error stack:', error.stack);
+        errorResponse(res, 500, `Analytics error: ${error.message}`);
     }
 };

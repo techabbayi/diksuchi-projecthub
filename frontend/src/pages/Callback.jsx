@@ -125,10 +125,10 @@ const Callback = () => {
                 setError(errorMessage);
                 toast.error(errorMessage);
 
-                // Redirect to login after 5 seconds
+                // Redirect to login after 15 seconds
                 setTimeout(() => {
                     navigate('/login');
-                }, 5000);
+                }, 15000);
             }
         };
 
@@ -162,7 +162,7 @@ const Callback = () => {
                             {error}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-500">
-                            Redirecting to login page in 5 seconds...
+                            Redirecting to login page in 15 seconds...
                         </p>
                     </div>
                 </div>
