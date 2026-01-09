@@ -56,6 +56,9 @@ if (process.env.GROQ_API_KEY) {
 // Initialize app
 const app = express();
 
+// Enable trust proxy for Render deployment (handles X-Forwarded-For correctly)
+app.set('trust proxy', true);
+
 // Security middleware
 app.use(helmet());
 
