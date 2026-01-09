@@ -91,42 +91,42 @@ const determineTrafficSource = (referrer) => {
 
     // Search engines
     if (referrerDomain.includes('google')) {
-        return { source: 'google', medium: 'organic' };
+        return { source: 'search', medium: 'organic' };
     }
     if (referrerDomain.includes('bing')) {
-        return { source: 'bing', medium: 'organic' };
+        return { source: 'search', medium: 'organic' };
     }
     if (referrerDomain.includes('yahoo')) {
-        return { source: 'yahoo', medium: 'organic' };
+        return { source: 'search', medium: 'organic' };
     }
     if (referrerDomain.includes('duckduckgo')) {
-        return { source: 'duckduckgo', medium: 'organic' };
+        return { source: 'search', medium: 'organic' };
     }
 
     // Social media
     if (referrerDomain.includes('facebook')) {
-        return { source: 'facebook', medium: 'social' };
+        return { source: 'social', medium: 'social' };
     }
     if (referrerDomain.includes('twitter') || referrerDomain.includes('x.com')) {
-        return { source: 'twitter', medium: 'social' };
+        return { source: 'social', medium: 'social' };
     }
     if (referrerDomain.includes('linkedin')) {
-        return { source: 'linkedin', medium: 'social' };
+        return { source: 'social', medium: 'social' };
     }
     if (referrerDomain.includes('instagram')) {
-        return { source: 'instagram', medium: 'social' };
+        return { source: 'social', medium: 'social' };
     }
     if (referrerDomain.includes('youtube')) {
-        return { source: 'youtube', medium: 'social' };
+        return { source: 'social', medium: 'social' };
     }
     if (referrerDomain.includes('reddit')) {
-        return { source: 'reddit', medium: 'social' };
+        return { source: 'social', medium: 'social' };
     }
     if (referrerDomain.includes('github')) {
-        return { source: 'github', medium: 'referral' };
+        return { source: 'referral', medium: 'referral' };
     }
 
-    return { source: referrerDomain, medium: 'referral' };
+    return { source: 'referral', medium: 'referral' };
 };
 
 // Get client IP address
@@ -144,8 +144,15 @@ const getClientIP = (req) => {
 export const trackPageVisit = async (req, res, next) => {
     try {
         // Skip tracking for certain routes
-        const skipRoutes = ['/api', '/health', '/favicon.ico', '/robots.txt', '/.well-known'];
-        const shouldSkip = skipRoutes.some(route => req.path.startsWith(route));
+        const skipRoutes = ['/api', '/health', '/robots.txt', '/.well-known'];
+        const skipFiles = ['/favicon.ico', '/favicon.png', '/apple-touch-icon.png', '/manifest.json'];
+
+        const shouldSkip = skipRoutes.some(route => req.path.startsWith(route)) ||
+            skipFiles.some(file => req.path === file) ||
+            req.path.endsWith('.ico') ||
+            req.path.endsWith('.png') ||
+            req.path.endsWith('.js') ||
+            req.path.endsWith('.css');
 
         if (shouldSkip) {
             return next();
