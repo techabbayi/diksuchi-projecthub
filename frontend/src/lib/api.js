@@ -9,8 +9,7 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    // Enable request/response caching for better performance
-    adapter: 'http', // Use http adapter for better performance
+    // Browser will automatically use the best available adapter (xhr or fetch)
 });
 
 // Cache for recent requests to prevent redundant API calls
