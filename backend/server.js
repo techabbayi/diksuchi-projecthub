@@ -57,16 +57,19 @@ if (process.env.GROQ_API_KEY) {
 const app = express();
 
 // Enable trust proxy for Render deployment (handles X-Forwarded-For correctly)
-app.set('trust proxy', true);
+app.set('trust proxy', 1); // Trust first proxy (Render's load balancer)
 
 // Security middleware
 app.use(helmet());
 
-// Rate limiting
+// Rate limiting with proper trust proxy configuration
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // Limit each IP to 100 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
+    trustProxy: 1, // Trust first proxy for proper IP detection
+    standardHeaders: true, // Return rate limit info in headers
+    legacyHeaders: false, // Disable X-RateLimit-* headers
 });
 
 app.use('/api/', limiter);

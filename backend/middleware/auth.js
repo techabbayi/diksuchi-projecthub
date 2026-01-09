@@ -8,6 +8,11 @@ import User from '../models/User.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Cache for public key and user data to improve performance
+let cachedPublicKey = null;
+const userCache = new Map();
+const CACHE_DURATION = 300000; // 5 minutes
+
 // Load RSA public key for OAuth token verification with caching
 const getPublicKey = () => {
     // Return cached key if available
