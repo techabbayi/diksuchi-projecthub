@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { HelmetProvider } from 'react-helmet-async'
 import './index.css'
 import App from './App.jsx'
+import { authPerformanceOptimizer } from './utils/performance.js'
+
+// Initialize performance optimizations immediately
+authPerformanceOptimizer.init();
 
 const rootElement = document.getElementById('root');
 

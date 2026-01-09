@@ -61,24 +61,53 @@ export const useAuthStore = create(
                 toast.success('Logged out successfully');
             },
 
+            // Optimized fetchUser with caching and faster execution
             fetchUser: async () => {
                 try {
-                    // Sync token from localStorage to Zustand state
-                    const storedToken = localStorage.getItem('access_token') || localStorage.getItem('token');
+                    // Use OAuth token with priority, fallback to regular token
+                    const oauthToken = localStorage.getItem('access_token');
+                    const regularToken = localStorage.getItem('token');
+                    const storedToken = oauthToken || regularToken;
 
                     if (!storedToken) {
-                        // No token available, clear auth state
                         set({ user: null, token: null, isAuthenticated: false });
                         throw new Error('No authentication token found');
                     }
 
-                    const { data } = await api.get('/auth/me');
-                    set({
-                        user: data.data,
-                        token: storedToken,
-                        isAuthenticated: true
-                    });
-                    return data.data;
+                    // Check if user data is already cached and token hasn't changed
+                    const currentState = get();
+                    if (currentState.user && currentState.token === storedToken && currentState.isAuthenticated) {
+                        return currentState.user; // Return cached user immediately
+                    }
+
+                    // Fetch with timeout for faster performance
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
+                    try {
+                        const { data } = await api.get('/auth/me', {
+                            signal: controller.signal,
+                            timeout: 8000 // Additional axios timeout
+                        });
+
+                        clearTimeout(timeoutId);
+
+                        // Update state with fetched user data
+                        const userData = data.data;
+                        set({
+                            user: userData,
+                            token: storedToken,
+                            isAuthenticated: true
+                        });
+
+                        return userData;
+                    } catch (fetchError) {
+                        clearTimeout(timeoutId);
+                        if (fetchError.name === 'AbortError') {
+                            throw new Error('User fetch timed out. Please check your connection.');
+                        }
+                        throw fetchError;
+                    }
                 } catch (error) {
                     console.error('Fetch user error:', error);
                     // Clear auth state on error (token expired or invalid)

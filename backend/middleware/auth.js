@@ -8,39 +8,32 @@ import User from '../models/User.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load RSA public key for OAuth token verification
+// Load RSA public key for OAuth token verification with caching
 const getPublicKey = () => {
+    // Return cached key if available
+    if (cachedPublicKey) {
+        return cachedPublicKey;
+    }
+
     try {
-        // Priority 1: Environment variable (for production deployment - Vercel, Railway, etc.)
-        // This is the RECOMMENDED way for production
+        // Priority 1: Environment variable (for production deployment)
         if (process.env.DIKSUCHI_PUBLIC_KEY) {
             let key = process.env.DIKSUCHI_PUBLIC_KEY;
-
-            // Remove surrounding quotes if present
             key = key.replace(/^["']|["']$/g, '');
-
-            // Replace literal \n with actual newlines (for single-line env vars)
             key = key.replace(/\\n/g, '\n');
-
-            // Trim whitespace
             key = key.trim();
 
-            // Validate it's a PEM key
             if (key.includes('BEGIN PUBLIC KEY')) {
                 try {
-                    // Validate the key by creating a KeyObject
                     const keyObject = crypto.createPublicKey({
                         key: key,
                         format: 'pem'
                     });
-
-                    // Export back to PEM string for jwt library
                     const pemKey = keyObject.export({
                         type: 'spki',
                         format: 'pem'
                     });
-
-
+                    cachedPublicKey = pemKey; // Cache the key
                     return pemKey;
                 } catch (keyError) {
                     console.error('❌ [getPublicKey] Failed to parse key from environment:', keyError.message);
@@ -50,24 +43,18 @@ const getPublicKey = () => {
 
         // Priority 2: Load from file (for local development only)
         const keyPath = path.join(__dirname, '../config/diksuchi-public.pem');
-
         if (fs.existsSync(keyPath)) {
             const key = fs.readFileSync(keyPath, 'utf8');
-
             try {
-                // Validate the key by creating a KeyObject
                 const keyObject = crypto.createPublicKey({
                     key: key,
                     format: 'pem'
                 });
-
-                // Export back to PEM string for jwt library
                 const pemKey = keyObject.export({
                     type: 'spki',
                     format: 'pem'
                 });
-
-
+                cachedPublicKey = pemKey; // Cache the key
                 return pemKey;
             } catch (keyError) {
                 console.error('❌ [getPublicKey] Failed to parse key from file:', keyError.message);
@@ -178,20 +165,25 @@ const syncOAuthUser = async (decoded) => {
     }
 };
 
-// Protect routes - verify JWT token (both OAuth and regular)
+// Protect routes - verify JWT token (both OAuth and regular) with caching
 export const protect = async (req, res, next) => {
-
     try {
         let token;
 
         if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
             token = req.headers.authorization.split(' ')[1];
-
         }
 
         if (!token) {
-
             return res.status(401).json({ message: 'Not authorized, no token' });
+        }
+
+        // Check cache first for performance
+        const cached = userCache.get(token);
+        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+            req.user = cached.user;
+            req.dbUser = cached.dbUser;
+            return next();
         }
 
         let decoded;
@@ -199,41 +191,50 @@ export const protect = async (req, res, next) => {
 
         // Try verifying as OAuth token first (RS256)
         try {
-
             decoded = verifyOAuthToken(token);
             isOAuthToken = true;
-
         } catch (oauthError) {
-
             // If OAuth verification fails, try regular JWT (HS256)
             try {
                 decoded = jwt.verify(token, process.env.JWT_SECRET);
-
             } catch (regularError) {
-
                 return res.status(401).json({ message: 'Not authorized, token failed' });
             }
         }
 
+        let user, dbUser;
+
         if (isOAuthToken) {
             // OAuth token - sync user from token data
-
-            req.user = { _id: decoded.sub };
-            req.dbUser = await syncOAuthUser(decoded);
-            req.user = req.dbUser;
-
+            user = { _id: decoded.sub };
+            dbUser = await syncOAuthUser(decoded);
+            user = dbUser;
         } else {
-            // Regular token - get user from database
+            // Regular token - get user from database with optimized query
+            user = await User.findById(decoded.id)
+                .select('-password')
+                .lean(); // Use lean() for faster queries
 
-            req.user = await User.findById(decoded.id).select('-password');
-
-            if (!req.user) {
-
+            if (!user) {
                 return res.status(401).json({ message: 'User not found' });
             }
-
         }
 
+        // Cache the user data for performance
+        userCache.set(token, {
+            user: user,
+            dbUser: dbUser,
+            timestamp: Date.now()
+        });
+
+        // Clean up old cache entries (keep only last 100)
+        if (userCache.size > 100) {
+            const firstKey = userCache.keys().next().value;
+            userCache.delete(firstKey);
+        }
+
+        req.user = user;
+        req.dbUser = dbUser;
 
         next();
     } catch (error) {

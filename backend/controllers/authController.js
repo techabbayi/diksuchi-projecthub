@@ -98,17 +98,21 @@ export const login = async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private
 export const getMe = async (req, res) => {
-
-
     try {
-        const user = await User.findById(req.user._id).populate('favorites', 'title screenshots price');
+        // Optimized user fetch with selected fields only (faster query)
+        const user = await User.findById(req.user._id)
+            .select('_id oauthId name username email role avatar bio wallet isVerified createdAt updatedAt')
+            .populate('favorites', 'title screenshots price')
+            .lean(); // Use lean() for faster queries when not modifying data
 
         if (!user) {
-
             return errorResponse(res, 404, 'User not found');
         }
 
-
+        // Add purchasedProjects if it exists
+        if (!user.purchasedProjects) {
+            user.purchasedProjects = [];
+        }
 
         successResponse(res, 200, 'User profile fetched', {
             _id: user._id,

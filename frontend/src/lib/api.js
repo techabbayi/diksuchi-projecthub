@@ -2,18 +2,25 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// Create optimized axios instance with performance improvements
 const api = axios.create({
     baseURL: API_URL,
+    timeout: 10000, // 10 second timeout for faster failures
     headers: {
         'Content-Type': 'application/json',
     },
+    // Enable request/response caching for better performance
+    adapter: 'http', // Use http adapter for better performance
 });
 
-// Request interceptor to add auth token
+// Cache for recent requests to prevent redundant API calls
+const requestCache = new Map();
+const CACHE_DURATION = 30000; // 30 seconds cache
+
+// Request interceptor with caching and optimized token handling
 api.interceptors.request.use(
     (config) => {
         // Priority: OAuth access_token > regular token
-        // This ensures OAuth tokens are always preferred
         const oauthToken = localStorage.getItem('access_token');
         const regularToken = localStorage.getItem('token');
         const token = oauthToken || regularToken;
@@ -21,6 +28,21 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // Add caching for GET requests to user profile
+        if (config.method === 'get' && config.url === '/auth/me') {
+            const cacheKey = `${config.method}:${config.url}:${token}`;
+            const cached = requestCache.get(cacheKey);
+
+            if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+                // Return cached response
+                return Promise.reject({
+                    __CACHED_RESPONSE__: true,
+                    data: cached.data
+                });
+            }
+        }
+
         return config;
     },
     (error) => {

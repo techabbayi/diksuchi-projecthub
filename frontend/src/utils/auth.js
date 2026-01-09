@@ -98,42 +98,55 @@ export const handleCallback = async (code) => {
             client_id: CLIENT_ID,
         };
 
-        const response = await fetch(tokenEndpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-        });
+        // Optimized fetch with timeout for faster performance
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-        if (!response.ok) {
-            let errorMessage = 'Token exchange failed';
-            try {
-                const error = await response.json();
-                errorMessage = error.error_description || error.error || error.message || errorMessage;
-            } catch (e) {
-                // Response wasn't JSON
-                errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        try {
+            const response = await fetch(tokenEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                let errorMessage = 'Token exchange failed';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.error_description || error.error || error.message || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
             }
-            throw new Error(errorMessage);
+
+            const data = await response.json();
+            const access_token = data.access_token;
+
+            if (!access_token) {
+                throw new Error('No access token received from server');
+            }
+
+            // Store access token immediately with both keys for compatibility
+            localStorage.setItem('access_token', access_token);
+            localStorage.setItem('token', access_token); // Fallback compatibility
+
+            // Clean up code verifier
+            sessionStorage.removeItem('code_verifier');
+
+            return access_token;
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+                throw new Error('Token exchange timed out. Please try again.');
+            }
+            throw fetchError;
         }
-
-        const data = await response.json();
-
-        // Auth server returns token directly (not wrapped in data object)
-        const access_token = data.access_token;
-
-        if (!access_token) {
-            throw new Error('No access token received from server');
-        }
-
-        // Store access token
-        localStorage.setItem('access_token', access_token);
-
-        // Clean up code verifier
-        sessionStorage.removeItem('code_verifier');
-
-        return access_token;
     } catch (error) {
         console.error('OAuth callback error:', error);
         sessionStorage.removeItem('code_verifier');

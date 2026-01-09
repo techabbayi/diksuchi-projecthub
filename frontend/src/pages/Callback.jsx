@@ -39,40 +39,31 @@ const Callback = () => {
                     throw new Error('Invalid state parameter - possible security threat');
                 }
 
-                // Clear old tokens first
-                localStorage.removeItem('token');
-                localStorage.removeItem('access_token');
-
-                // Exchange code for token
+                // Exchange code for token (optimized with timeout)
                 const token = await handleCallback(code);
 
                 if (!token) {
                     throw new Error('Failed to obtain access token');
                 }
 
-                // Verify token was stored
-                const storedToken = localStorage.getItem('access_token');
-                if (!storedToken) {
-                    throw new Error('Token was not saved to localStorage after exchange');
-                }
-
-                // Clean up OAuth session data
+                // Clean up OAuth session data immediately
                 sessionStorage.removeItem('oauth_state');
 
-                // Fetch user data with error handling
-                try {
-                    await fetchUser();
-                } catch (fetchError) {
-                    console.error('Failed to fetch user after OAuth:', fetchError);
-                    // Don't throw here - we have a valid token
-                    toast.error('Login successful, but failed to load user details. Please refresh.');
-                }
+                // Show success message immediately
+                toast.success('Successfully logged in!', {
+                    duration: 2000,
+                    position: 'top-center'
+                });
 
-                // Show success message
-                toast.success('Successfully logged in with Diksuchi!');
+                // Fetch user data in background while redirecting (don't wait)
+                fetchUser().catch(fetchError => {
+                    console.error('Background user fetch failed:', fetchError);
+                    // User can still use the app, just refresh to get user data
+                });
 
-                // Redirect to dashboard
-                navigate('/dashboard');
+                // Immediate redirect for faster UX (don't wait for user fetch)
+                navigate('/dashboard', { replace: true });
+
             } catch (err) {
                 console.error('OAuth callback error:', err);
                 let errorMessage = err.message || 'Login failed';
@@ -81,14 +72,17 @@ const Callback = () => {
                 if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
                     errorMessage = 'Cannot connect to server. Please check your connection.';
                 }
+                if (errorMessage.includes('timed out')) {
+                    errorMessage = 'Login is taking longer than expected. Please try again.';
+                }
 
                 setError(errorMessage);
                 toast.error(errorMessage);
 
-                // Redirect to login after 15 seconds
+                // Faster redirect on error
                 setTimeout(() => {
                     navigate('/login');
-                }, 15000);
+                }, 5000); // Reduced from 15s to 5s
             }
         };
 
@@ -122,7 +116,7 @@ const Callback = () => {
                             {error}
                         </p>
                         <p className="text-sm text-gray-500 dark:text-gray-500">
-                            Redirecting to login page in 15 seconds...
+                            Redirecting to login page in 5 seconds...
                         </p>
                     </div>
                 </div>
