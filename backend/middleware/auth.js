@@ -112,6 +112,9 @@ const syncOAuthUser = async (decoded) => {
                 user.oauthId = decoded.sub;
                 if (decoded.name) user.name = decoded.name;
                 if (decoded.picture) user.avatar = decoded.picture;
+                if (decoded.authProviders && decoded.authProviders.length > 0) {
+                    user.authProvider = decoded.authProviders.find(p => p !== 'local') || 'diksuchi';
+                }
                 user.isVerified = true;
                 await user.save();
 
@@ -129,6 +132,7 @@ const syncOAuthUser = async (decoded) => {
                         username: username,
                         name: decoded.name || baseUsername,
                         avatar: decoded.picture,
+                        authProvider: decoded.authProviders?.find(p => p !== 'local') || 'diksuchi',
                         role: 'user',
                         isVerified: true,
                     });
@@ -143,6 +147,7 @@ const syncOAuthUser = async (decoded) => {
                             email: decoded.email,
                             username: username,
                             name: decoded.name || baseUsername,
+                            authProvider: decoded.authProviders?.find(p => p !== 'local') || 'diksuchi',
                             avatar: decoded.picture,
                             role: 'user',
                             isVerified: true,
@@ -161,9 +166,15 @@ const syncOAuthUser = async (decoded) => {
             }
             if (decoded.name && user.name !== decoded.name) {
                 user.name = decoded.name;
+            }
             if (decoded.picture && user.avatar !== decoded.picture) {
                 user.avatar = decoded.picture;
             }
+            if (decoded.authProviders && decoded.authProviders.length > 0) {
+                const provider = decoded.authProviders.find(p => p !== 'local');
+                if (provider && user.authProvider !== provider) {
+                    user.authProvider = provider;
+                }
             }
             await user.save();
         }

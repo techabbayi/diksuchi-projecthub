@@ -111,7 +111,7 @@ export const getMe = async (req, res) => {
     try {
         // Optimized user fetch with selected fields only (faster query)
         const user = await User.findById(req.user._id)
-            .select('_id oauthId name username email role avatar bio wallet isVerified createdAt updatedAt')
+            .select('_id oauthId name username email role avatar authProvider bio wallet isVerified createdAt updatedAt')
             .populate('favorites', 'title screenshots price')
             .lean(); // Use lean() for faster queries when not modifying data
 
@@ -132,6 +132,7 @@ export const getMe = async (req, res) => {
             email: user.email,
             role: user.role,
             avatar: user.avatar,
+            authProvider: user.authProvider,
             bio: user.bio,
             wallet: user.wallet,
             favorites: user.favorites,
