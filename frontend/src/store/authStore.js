@@ -110,9 +110,17 @@ export const useAuthStore = create(
                         return userData;
                     } catch (fetchError) {
                         clearTimeout(timeoutId);
-                        if (fetchError.name === 'AbortError') {
+
+                        // Don't throw on abort - component unmounted, request canceled
+                        if (fetchError.name === 'AbortError' || fetchError.name === 'CanceledError') {
+                            console.warn('Fetch user request was aborted/canceled');
+                            throw new Error('Request canceled');
+                        }
+
+                        if (fetchError.code === 'ECONNABORTED') {
                             throw new Error('User fetch timed out. Please check your connection.');
                         }
+
                         throw fetchError;
                     }
                 } catch (error) {

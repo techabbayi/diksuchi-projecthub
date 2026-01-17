@@ -53,6 +53,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        // Don't handle canceled/aborted requests
+        if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError' || error.message?.includes('canceled')) {
+            return Promise.reject(error);
+        }
+
         if (error.response?.status === 401) {
             // Show toast notification before redirect
             const toastMessage = error.response?.data?.message || 'Session expired. Please login again.';

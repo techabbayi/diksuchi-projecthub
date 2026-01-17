@@ -59,10 +59,30 @@ const Callback = () => {
                 // This ensures isAuthenticated is true before ProtectedRoute check
                 try {
                     await fetchUser();
+
+                    // Small delay to ensure state is fully propagated
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
                     // Redirect only after auth state is properly set
                     navigate('/dashboard', { replace: true });
                 } catch (fetchError) {
                     console.error('User fetch failed:', fetchError);
+
+                    // Check if it's a canceled request (ERR_CANCELED)
+                    if (fetchError.message?.includes('canceled') || fetchError.code === 'ERR_CANCELED') {
+                        console.log('Request was canceled, retrying...');
+                        // Retry once after a short delay
+                        try {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            await fetchUser();
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            navigate('/dashboard', { replace: true });
+                            return;
+                        } catch (retryError) {
+                            console.error('Retry failed:', retryError);
+                        }
+                    }
+
                     setError('Login successful but failed to load user data. Please refresh the page.');
                     toast.error('Failed to load user data. Please try refreshing.');
                 }

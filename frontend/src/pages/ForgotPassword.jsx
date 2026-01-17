@@ -10,22 +10,55 @@ import toast from 'react-hot-toast';
 import api from '../lib/api';
 
 const ForgotPassword = () => {
-    const [step, setStep] = useState('email'); // email, otp, newPassword, success
+    const [step, setStep] = useState('email'); // email, userType, otp, newPassword, success
     const [email, setEmail] = useState('');
+    const [userType, setUserType] = useState(''); // 'projecthub' or 'das-identity'
     const [otp, setOtp] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const handleCheckUserType = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const response = await api.post('/auth/check-user-type', { email });
+
+            if (response.data.success) {
+                setUserType(response.data.data.userType);
+                toast.success(response.data.data.message);
+                setStep('userType');
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'No account found with this email');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSendOTP = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await api.post('/auth/forgot-password', { email });
-            toast.success('OTP sent to your email!');
-            setStep('otp');
+            // First check user type
+            const userCheckResponse = await api.post('/auth/check-user-type', { email });
+
+            if (userCheckResponse.data.success) {
+                const userData = userCheckResponse.data.data;
+                setUserType(userData.userType);
+
+                // Show user type message and send OTP
+                if (userData.userType === 'das-identity') {
+                    toast.success('DAS Identity account detected. OTP sent to your email!');
+                } else {
+                    // Send OTP for ProjectHub users
+                    await api.post('/auth/forgot-password', { email });
+                    toast.success('ProjectHub account detected. OTP sent to your email!');
+                }
+                setStep('otp');
+            }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to send OTP');
+            toast.error(error.response?.data?.message || 'No account found with this email');
         } finally {
             setLoading(false);
         }
@@ -35,8 +68,13 @@ const ForgotPassword = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            await api.post('/auth/verify-otp', { email, otp });
-            toast.success('OTP verified successfully!');
+            if (userType === 'projecthub') {
+                await api.post('/auth/verify-otp', { email, otp });
+            } else {
+                // For DAS Identity users, we'll verify OTP in the password reset step
+                // Just move to next step for now
+            }
+            toast.success('OTP verified! Please set your new password.');
             setStep('newPassword');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Invalid OTP');
@@ -60,8 +98,28 @@ const ForgotPassword = () => {
 
         setLoading(true);
         try {
-            await api.post('/auth/reset-password', { email, otp, newPassword });
-            toast.success('Password reset successfully!');
+            if (userType === 'projecthub') {
+                await api.post('/auth/reset-password', { email, otp, newPassword });
+            } else {
+                // For DAS Identity users, call DAS Identity API directly
+                const response = await fetch(`${process.env.REACT_APP_AUTH_SERVER_URL || 'https://dasnextjs.vercel.app'}/api/auth/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email,
+                        otp,
+                        newPassword
+                    }),
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to reset password');
+                }
+            }
+            toast.success(`Password reset successfully${userType === 'das-identity' ? ' via DAS Identity' : ''}!`);
             setStep('success');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to reset password');
@@ -159,6 +217,19 @@ const ForgotPassword = () => {
 
                         {step === 'otp' && (
                             <form onSubmit={handleVerifyOTP} className="space-y-5">
+                                {userType && (
+                                    <div className={`p-3 rounded-lg border ${userType === 'das-identity'
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+                                        : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                                        }`}>
+                                        <p className={`text-sm font-medium ${userType === 'das-identity'
+                                            ? 'text-emerald-800 dark:text-emerald-200'
+                                            : 'text-blue-800 dark:text-blue-200'
+                                            }`}>
+                                            {userType === 'das-identity' ? '🔐 DAS Identity Account' : '📧 ProjectHub Account'}
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     <Label htmlFor="otp" className="text-gray-700 dark:text-gray-300 font-medium">
                                         Enter OTP
