@@ -112,9 +112,23 @@ const syncOAuthUser = async (decoded) => {
                 user.oauthId = decoded.sub;
                 if (decoded.name) user.name = decoded.name;
                 if (decoded.picture) user.avatar = decoded.picture;
+
+                // Set authProvider from JWT or detect from profile picture
                 if (decoded.authProviders && decoded.authProviders.length > 0) {
                     user.authProvider = decoded.authProviders.find(p => p !== 'local') || 'diksuchi';
+                } else if (decoded.picture) {
+                    // Fallback: detect provider from profile picture URL
+                    if (decoded.picture.includes('github')) {
+                        user.authProvider = 'github';
+                    } else if (decoded.picture.includes('google') || decoded.picture.includes('googleapis')) {
+                        user.authProvider = 'google';
+                    } else if (decoded.picture.includes('licdn')) {
+                        user.authProvider = 'linkedin';
+                    } else {
+                        user.authProvider = 'diksuchi';
+                    }
                 }
+
                 user.isVerified = true;
                 await user.save();
 
@@ -124,6 +138,16 @@ const syncOAuthUser = async (decoded) => {
                 const baseUsername = decoded.email.split('@')[0];
                 let username = baseUsername + '_' + decoded.sub.substring(0, 8);
 
+                // Detect auth provider from JWT or profile picture
+                let authProvider = 'diksuchi';
+                if (decoded.authProviders && decoded.authProviders.length > 0) {
+                    authProvider = decoded.authProviders.find(p => p !== 'local') || 'diksuchi';
+                } else if (decoded.picture) {
+                    if (decoded.picture.includes('github')) authProvider = 'github';
+                    else if (decoded.picture.includes('google') || decoded.picture.includes('googleapis')) authProvider = 'google';
+                    else if (decoded.picture.includes('licdn')) authProvider = 'linkedin';
+                }
+
                 // Handle potential username collision with a more unique approach
                 try {
                     user = await User.create({
@@ -132,7 +156,7 @@ const syncOAuthUser = async (decoded) => {
                         username: username,
                         name: decoded.name || baseUsername,
                         avatar: decoded.picture,
-                        authProvider: decoded.authProviders?.find(p => p !== 'local') || 'diksuchi',
+                        authProvider: authProvider,
                         role: 'user',
                         isVerified: true,
                     });
@@ -147,7 +171,7 @@ const syncOAuthUser = async (decoded) => {
                             email: decoded.email,
                             username: username,
                             name: decoded.name || baseUsername,
-                            authProvider: decoded.authProviders?.find(p => p !== 'local') || 'diksuchi',
+                            authProvider: authProvider,
                             avatar: decoded.picture,
                             role: 'user',
                             isVerified: true,
@@ -170,12 +194,24 @@ const syncOAuthUser = async (decoded) => {
             if (decoded.picture && user.avatar !== decoded.picture) {
                 user.avatar = decoded.picture;
             }
+
+            // Update auth provider from JWT or detect from picture
             if (decoded.authProviders && decoded.authProviders.length > 0) {
                 const provider = decoded.authProviders.find(p => p !== 'local');
                 if (provider && user.authProvider !== provider) {
                     user.authProvider = provider;
                 }
+            } else if (decoded.picture && !user.authProvider) {
+                // Fallback: detect provider from profile picture URL
+                if (decoded.picture.includes('github')) {
+                    user.authProvider = 'github';
+                } else if (decoded.picture.includes('google') || decoded.picture.includes('googleapis')) {
+                    user.authProvider = 'google';
+                } else if (decoded.picture.includes('licdn')) {
+                    user.authProvider = 'linkedin';
+                }
             }
+
             await user.save();
         }
 
