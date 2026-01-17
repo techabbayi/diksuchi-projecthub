@@ -77,7 +77,7 @@ export const login = async (req, res) => {
 
         // Check if user has a password (OAuth users might not have one)
         if (!user.password) {
-            return errorResponse(res, 401, 'Please login using your OAuth provider');
+            return errorResponse(res, 401, 'Please login using DAS Identity: https://dasnextjs.vercel.app/dasauth');
         }
 
         // Check password
@@ -225,7 +225,7 @@ export const changePassword = async (req, res) => {
 
         // Check if user has a password (OAuth users might not have one)
         if (!user.password) {
-            return errorResponse(res, 400, 'Cannot change password for OAuth accounts. Please use your OAuth provider to change password.');
+            return errorResponse(res, 400, 'Password change not available. Please use DAS Identity portal to manage your password: https://dasnextjs.vercel.app/dasauth?action=change-password');
         }
 
         const isMatch = await user.comparePassword(currentPassword);

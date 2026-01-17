@@ -111,6 +111,7 @@ const syncOAuthUser = async (decoded) => {
                 // User exists with this email, just link the OAuth ID
                 user.oauthId = decoded.sub;
                 if (decoded.name) user.name = decoded.name;
+                if (decoded.picture) user.avatar = decoded.picture;
                 user.isVerified = true;
                 await user.save();
 
@@ -127,6 +128,7 @@ const syncOAuthUser = async (decoded) => {
                         email: decoded.email,
                         username: username,
                         name: decoded.name || baseUsername,
+                        avatar: decoded.picture,
                         role: 'user',
                         isVerified: true,
                     });
@@ -141,6 +143,7 @@ const syncOAuthUser = async (decoded) => {
                             email: decoded.email,
                             username: username,
                             name: decoded.name || baseUsername,
+                            avatar: decoded.picture,
                             role: 'user',
                             isVerified: true,
                         });
@@ -158,6 +161,9 @@ const syncOAuthUser = async (decoded) => {
             }
             if (decoded.name && user.name !== decoded.name) {
                 user.name = decoded.name;
+            if (decoded.picture && user.avatar !== decoded.picture) {
+                user.avatar = decoded.picture;
+            }
             }
             await user.save();
         }

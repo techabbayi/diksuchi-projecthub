@@ -83,7 +83,6 @@ app.use(cookieParser());
 
 // Compression
 app.use(compression());
-
 // CORS - More permissive configuration
 const allowedOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
